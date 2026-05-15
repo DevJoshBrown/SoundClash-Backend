@@ -18,8 +18,8 @@ RETURNING id, username, display_name, elo_rating, battles_played, battles_won, c
 `
 
 type CreateUserParams struct {
-	Username    string
-	DisplayName string
+	Username    string `json:"username"`
+	DisplayName string `json:"display_name"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {

@@ -8,13 +8,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Battle struct {
+	ID              pgtype.UUID        `json:"id"`
+	CreatorID       pgtype.UUID        `json:"creator_id"`
+	Mode            string             `json:"mode"`
+	Genre           pgtype.Text        `json:"genre"`
+	SamplePackID    pgtype.UUID        `json:"sample_pack_id"`
+	Status          string             `json:"status"`
+	DurationMinutes int32              `json:"duration_minutes"`
+	MaxParticipants int32              `json:"max_participants"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	CompletedAt     pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
 type User struct {
-	ID            pgtype.UUID
-	Username      string
-	DisplayName   string
-	EloRating     int32
-	BattlesPlayed int32
-	BattlesWon    int32
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
+	ID            pgtype.UUID        `json:"id"`
+	Username      string             `json:"username"`
+	DisplayName   string             `json:"display_name"`
+	EloRating     int32              `json:"elo_rating"`
+	BattlesPlayed int32              `json:"battles_played"`
+	BattlesWon    int32              `json:"battles_won"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }

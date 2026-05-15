@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/DevJoshBrown/BeatBattler/internal/battle"
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/DevJoshBrown/BeatBattler/internal/user"
@@ -30,6 +31,7 @@ func main() {
 	//create queries & handlers (internal/db - sqlc generated)
 	queries := db.New(pool)
 	userHandler := user.NewHandler(queries)
+	battleHandler := battle.NewHandler(queries)
 
 	// Register routes on chi router
 	r := chi.NewRouter()
@@ -40,8 +42,14 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	// Handlers
+	// users
 	r.Post("/users", userHandler.CreateUser)
 	r.Get("/users/{id}", userHandler.GetUser)
+	// battles
+	r.Post("/battles", battleHandler.CreateBattle)
+	r.Get("/battles", battleHandler.ListBattles)
+	r.Get("/battles/{id}", battleHandler.GetBattle)
 
 	// Start server
 	addr := ":" + cfg.Port
