@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
+	"github.com/DevJoshBrown/BeatBattler/pkg/storage/postgres"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -14,6 +16,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
+
+	pool, err := postgres.NewPool(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("failed to create a connection pool")
+	}
+	log.Printf("database connected - connections: %v", pool.Stat().TotalConns())
+	defer pool.Close()
 
 	r := chi.NewRouter()
 
