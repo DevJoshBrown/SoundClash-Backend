@@ -1,0 +1,30 @@
+package main
+
+import (
+	"log"
+	"net/http"
+
+	"github.com/DevJoshBrown/BeatBattler/internal/config"
+	"github.com/go-chi/chi/v5"
+)
+
+func main() {
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	r := chi.NewRouter()
+
+	r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	addr := ":" + cfg.Port
+	log.Printf("BeatBattler listening on %s", addr)
+	if err := http.ListenAndServe(addr, r); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
+}
