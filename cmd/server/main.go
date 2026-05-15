@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
+	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/DevJoshBrown/BeatBattler/pkg/storage/postgres"
 	"github.com/go-chi/chi/v5"
 )
@@ -23,6 +24,8 @@ func main() {
 	}
 	log.Printf("database connected - connections: %v", pool.Stat().TotalConns())
 	defer pool.Close()
+
+	queries := db.New(pool)
 
 	r := chi.NewRouter()
 
