@@ -99,3 +99,37 @@ func (q *Queries) GetVotesForBattle(ctx context.Context, battleID pgtype.UUID) (
 	}
 	return items, nil
 }
+
+const upsertVote = `-- name: UpsertVote :one
+INSERT INTO votes (battle_id, voter_id, voted_for_participant_id, score)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (battle_id, voter_id, voted_for_participant_id)
+DO UPDATE SET score = EXCLUDED.score
+RETURNING id, battle_id, voter_id, voted_for_participant_id, score, created_at
+`
+
+type UpsertVoteParams struct {
+	BattleID              pgtype.UUID `json:"battle_id"`
+	VoterID               pgtype.UUID `json:"voter_id"`
+	VotedForParticipantID pgtype.UUID `json:"voted_for_participant_id"`
+	Score                 int32       `json:"score"`
+}
+
+func (q *Queries) UpsertVote(ctx context.Context, arg UpsertVoteParams) (Vote, error) {
+	row := q.db.QueryRow(ctx, upsertVote,
+		arg.BattleID,
+		arg.VoterID,
+		arg.VotedForParticipantID,
+		arg.Score,
+	)
+	var i Vote
+	err := row.Scan(
+		&i.ID,
+		&i.BattleID,
+		&i.VoterID,
+		&i.VotedForParticipantID,
+		&i.Score,
+		&i.CreatedAt,
+	)
+	return i, err
+}

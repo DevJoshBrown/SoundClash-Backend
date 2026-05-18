@@ -58,3 +58,31 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	)
 	return i, err
 }
+
+const updateUserElo = `-- name: UpdateUserElo :one
+UPDATE users
+SET elo_rating = $2
+WHERE id = $1
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, created_at, updated_at
+`
+
+type UpdateUserEloParams struct {
+	ID        pgtype.UUID `json:"id"`
+	EloRating int32       `json:"elo_rating"`
+}
+
+func (q *Queries) UpdateUserElo(ctx context.Context, arg UpdateUserEloParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserElo, arg.ID, arg.EloRating)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.EloRating,
+		&i.BattlesPlayed,
+		&i.BattlesWon,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

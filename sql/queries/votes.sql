@@ -11,3 +11,10 @@ WHERE battle_id = $1;
 -- name: GetVoteByVoterAndParticipant :one
 SELECT * FROM votes
 WHERE battle_id = $1 AND voter_id = $2 AND voted_for_participant_id = $3;
+
+-- name: UpsertVote :one
+INSERT INTO votes (battle_id, voter_id, voted_for_participant_id, score)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (battle_id, voter_id, voted_for_participant_id)
+DO UPDATE SET score = EXCLUDED.score
+RETURNING *;

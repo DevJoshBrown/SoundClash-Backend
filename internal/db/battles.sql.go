@@ -14,7 +14,7 @@ import (
 const createBattle = `-- name: CreateBattle :one
 INSERT INTO battles (creator_id, mode, genre, sample_pack_id, duration_minutes, max_participants)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, started_at, completed_at, created_at
+RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
 `
 
 type CreateBattleParams struct {
@@ -45,6 +45,8 @@ func (q *Queries) CreateBattle(ctx context.Context, arg CreateBattleParams) (Bat
 		&i.Status,
 		&i.DurationMinutes,
 		&i.MaxParticipants,
+		&i.CurrentListeningIndex,
+		&i.ListeningOrder,
 		&i.StartedAt,
 		&i.CompletedAt,
 		&i.CreatedAt,
@@ -53,7 +55,7 @@ func (q *Queries) CreateBattle(ctx context.Context, arg CreateBattleParams) (Bat
 }
 
 const getBattle = `-- name: GetBattle :one
-SELECT id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, started_at, completed_at, created_at FROM battles
+SELECT id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at FROM battles
 WHERE id = $1
 `
 
@@ -69,6 +71,8 @@ func (q *Queries) GetBattle(ctx context.Context, id pgtype.UUID) (Battle, error)
 		&i.Status,
 		&i.DurationMinutes,
 		&i.MaxParticipants,
+		&i.CurrentListeningIndex,
+		&i.ListeningOrder,
 		&i.StartedAt,
 		&i.CompletedAt,
 		&i.CreatedAt,
@@ -77,7 +81,7 @@ func (q *Queries) GetBattle(ctx context.Context, id pgtype.UUID) (Battle, error)
 }
 
 const listBattles = `-- name: ListBattles :many
-SELECT id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, started_at, completed_at, created_at FROM battles
+SELECT id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at FROM battles
 ORDER BY created_at DESC
 `
 
@@ -99,6 +103,8 @@ func (q *Queries) ListBattles(ctx context.Context) ([]Battle, error) {
 			&i.Status,
 			&i.DurationMinutes,
 			&i.MaxParticipants,
+			&i.CurrentListeningIndex,
+			&i.ListeningOrder,
 			&i.StartedAt,
 			&i.CompletedAt,
 			&i.CreatedAt,
@@ -111,4 +117,103 @@ func (q *Queries) ListBattles(ctx context.Context) ([]Battle, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateBattleStatus = `-- name: UpdateBattleStatus :one
+UPDATE battles
+SET status = $2
+WHERE id = $1
+RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
+`
+
+type UpdateBattleStatusParams struct {
+	ID     pgtype.UUID `json:"id"`
+	Status string      `json:"status"`
+}
+
+func (q *Queries) UpdateBattleStatus(ctx context.Context, arg UpdateBattleStatusParams) (Battle, error) {
+	row := q.db.QueryRow(ctx, updateBattleStatus, arg.ID, arg.Status)
+	var i Battle
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorID,
+		&i.Mode,
+		&i.Genre,
+		&i.SamplePackID,
+		&i.Status,
+		&i.DurationMinutes,
+		&i.MaxParticipants,
+		&i.CurrentListeningIndex,
+		&i.ListeningOrder,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateListingIndex = `-- name: UpdateListingIndex :one
+UPDATE battles
+SET current_listening_index = $2
+WHERE id = $1
+RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
+`
+
+type UpdateListingIndexParams struct {
+	ID                    pgtype.UUID `json:"id"`
+	CurrentListeningIndex int32       `json:"current_listening_index"`
+}
+
+func (q *Queries) UpdateListingIndex(ctx context.Context, arg UpdateListingIndexParams) (Battle, error) {
+	row := q.db.QueryRow(ctx, updateListingIndex, arg.ID, arg.CurrentListeningIndex)
+	var i Battle
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorID,
+		&i.Mode,
+		&i.Genre,
+		&i.SamplePackID,
+		&i.Status,
+		&i.DurationMinutes,
+		&i.MaxParticipants,
+		&i.CurrentListeningIndex,
+		&i.ListeningOrder,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateListingOrder = `-- name: UpdateListingOrder :one
+UPDATE battles
+SET listening_order = $2
+WHERE id = $1
+RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
+`
+
+type UpdateListingOrderParams struct {
+	ID             pgtype.UUID   `json:"id"`
+	ListeningOrder []pgtype.UUID `json:"listening_order"`
+}
+
+func (q *Queries) UpdateListingOrder(ctx context.Context, arg UpdateListingOrderParams) (Battle, error) {
+	row := q.db.QueryRow(ctx, updateListingOrder, arg.ID, arg.ListeningOrder)
+	var i Battle
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorID,
+		&i.Mode,
+		&i.Genre,
+		&i.SamplePackID,
+		&i.Status,
+		&i.DurationMinutes,
+		&i.MaxParticipants,
+		&i.CurrentListeningIndex,
+		&i.ListeningOrder,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }

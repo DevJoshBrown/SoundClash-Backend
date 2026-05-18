@@ -10,3 +10,21 @@ WHERE id = $1;
 -- name: ListBattles :many
 SELECT * FROM battles
 ORDER BY created_at DESC;
+
+-- name: UpdateBattleStatus :one
+UPDATE battles
+SET status = $2
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateListingIndex :one
+UPDATE battles
+SET current_listening_index = $2
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateListingOrder :one
+UPDATE battles
+SET listening_order = $2
+WHERE id = $1
+RETURNING *;

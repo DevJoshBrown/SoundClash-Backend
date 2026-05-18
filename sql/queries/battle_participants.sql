@@ -9,10 +9,20 @@ WHERE battle_id = $1 AND user_id = $2;
 
 -- name: ListParticipants :many
 SELECT * FROM battle_participants
-WHERE battle_id = $1;
+WHERE battle_id = $1 ORDER BY joined_at;
 
 -- name: UpdateParticipantBeatURL :one
 UPDATE battle_participants
 SET beat_url = $2, submitted_at = $3
 WHERE id = $1
 RETURNING *;
+
+-- name: ConfirmVotes :one
+UPDATE battle_participants
+SET votes_confirmed = TRUE
+WHERE id = $1
+RETURNING *;
+
+-- name: GetParticipantByID :one
+SELECT * FROM battle_participants
+WHERE id = $1;

@@ -5,5 +5,6 @@ CREATE TABLE battle_participants (
     beat_url TEXT,
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     submitted_at TIMESTAMPTZ,
+    votes_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
     UNIQUE (battle_id, user_id)
 );
