@@ -8,6 +8,32 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+<<<<<<< Updated upstream
+=======
+type Battle struct {
+	ID              pgtype.UUID        `json:"id"`
+	CreatorID       pgtype.UUID        `json:"creator_id"`
+	Mode            string             `json:"mode"`
+	Genre           pgtype.Text        `json:"genre"`
+	SamplePackID    pgtype.UUID        `json:"sample_pack_id"`
+	Status          string             `json:"status"`
+	DurationMinutes int32              `json:"duration_minutes"`
+	MaxParticipants int32              `json:"max_participants"`
+	StartedAt       pgtype.Timestamptz `json:"started_at"`
+	CompletedAt     pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type BattleParticipant struct {
+	ID          pgtype.UUID        `json:"id"`
+	BattleID    pgtype.UUID        `json:"battle_id"`
+	UserID      pgtype.UUID        `json:"user_id"`
+	BeatUrl     pgtype.Text        `json:"beat_url"`
+	JoinedAt    pgtype.Timestamptz `json:"joined_at"`
+	SubmittedAt pgtype.Timestamptz `json:"submitted_at"`
+}
+
+>>>>>>> Stashed changes
 type User struct {
 	ID            pgtype.UUID
 	Username      string
