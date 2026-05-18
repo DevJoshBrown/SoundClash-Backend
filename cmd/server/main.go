@@ -5,20 +5,8 @@ import (
 	"log"
 	"net/http"
 
-<<<<<<< Updated upstream
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-=======
 	"github.com/DevJoshBrown/BeatBattler/internal/battle"
 	"github.com/DevJoshBrown/BeatBattler/internal/battle_participants"
->>>>>>> Stashed changes
-=======
-	"github.com/DevJoshBrown/BeatBattler/internal/battle"
->>>>>>> main
-=======
-	"github.com/DevJoshBrown/BeatBattler/internal/battle"
-	"github.com/DevJoshBrown/BeatBattler/internal/battle_participants"
->>>>>>> Stashed changes
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/DevJoshBrown/BeatBattler/internal/user"
@@ -45,10 +33,7 @@ func main() {
 	queries := db.New(pool)
 	userHandler := user.NewHandler(queries)
 	battleHandler := battle.NewHandler(queries)
-<<<<<<< HEAD
 	participantHandler := battle_participants.NewHandler(queries)
-=======
->>>>>>> main
 
 	// Register routes on chi router
 	r := chi.NewRouter()
@@ -67,12 +52,9 @@ func main() {
 	r.Post("/battles", battleHandler.CreateBattle)
 	r.Get("/battles", battleHandler.ListBattles)
 	r.Get("/battles/{id}", battleHandler.GetBattle)
-<<<<<<< HEAD
 	// participants
 	r.Post("/battles/{id}/join", participantHandler.CreateParticipant)
 	r.Post("/battles/{id}/submit", participantHandler.SubmitParticipant)
-=======
->>>>>>> main
 
 	// Start server
 	addr := ":" + cfg.Port
