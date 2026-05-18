@@ -41,3 +41,12 @@ type User struct {
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
+
+type Vote struct {
+	ID                    pgtype.UUID        `json:"id"`
+	BattleID              pgtype.UUID        `json:"battle_id"`
+	VoterID               pgtype.UUID        `json:"voter_id"`
+	VotedForParticipantID pgtype.UUID        `json:"voted_for_participant_id"`
+	Score                 int32              `json:"score"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+}

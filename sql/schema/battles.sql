@@ -1,11 +1,11 @@
 CREATE TABLE battles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    creator_id UUID NOT NULL REFERENCES users(id),
+    creator_id UUID REFERENCES users(id),
     mode TEXT NOT NULL CHECK (mode IN ('sample_pack','ffa')),
     genre TEXT,
     sample_pack_id UUID,
     status TEXT NOT NULL DEFAULT 'waiting'
-        CHECK (status IN ('waiting','in_progress','listening','voting','completed','cancelled')),
+        CHECK (status IN ('waiting','forming','in_progress','upload','listening','voting','results','cancelled')),
     duration_minutes INTEGER NOT NULL CHECK (duration_minutes BETWEEN 10 AND 60),
     max_participants INTEGER NOT NULL CHECK (max_participants BETWEEN 2 AND 16),
     started_at TIMESTAMPTZ,
