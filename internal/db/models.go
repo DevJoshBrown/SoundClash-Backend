@@ -8,11 +8,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> main
 type Battle struct {
 	ID              pgtype.UUID        `json:"id"`
 	CreatorID       pgtype.UUID        `json:"creator_id"`
@@ -27,7 +22,6 @@ type Battle struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
-<<<<<<< HEAD
 type BattleParticipant struct {
 	ID          pgtype.UUID        `json:"id"`
 	BattleID    pgtype.UUID        `json:"battle_id"`
@@ -37,17 +31,6 @@ type BattleParticipant struct {
 	SubmittedAt pgtype.Timestamptz `json:"submitted_at"`
 }
 
->>>>>>> Stashed changes
-type User struct {
-	ID            pgtype.UUID
-	Username      string
-	DisplayName   string
-	EloRating     int32
-	BattlesPlayed int32
-	BattlesWon    int32
-	CreatedAt     pgtype.Timestamptz
-	UpdatedAt     pgtype.Timestamptz
-=======
 type User struct {
 	ID            pgtype.UUID        `json:"id"`
 	Username      string             `json:"username"`
@@ -57,5 +40,4 @@ type User struct {
 	BattlesWon    int32              `json:"battles_won"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
->>>>>>> main
 }
