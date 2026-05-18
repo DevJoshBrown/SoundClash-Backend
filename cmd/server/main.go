@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 <<<<<<< Updated upstream
 =======
@@ -14,6 +15,10 @@ import (
 =======
 	"github.com/DevJoshBrown/BeatBattler/internal/battle"
 >>>>>>> main
+=======
+	"github.com/DevJoshBrown/BeatBattler/internal/battle"
+	"github.com/DevJoshBrown/BeatBattler/internal/battle_participants"
+>>>>>>> Stashed changes
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/DevJoshBrown/BeatBattler/internal/user"
