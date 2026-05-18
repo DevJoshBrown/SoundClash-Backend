@@ -8,8 +8,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 =======
+=======
+>>>>>>> main
 type Battle struct {
 	ID              pgtype.UUID        `json:"id"`
 	CreatorID       pgtype.UUID        `json:"creator_id"`
@@ -24,6 +27,7 @@ type Battle struct {
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
+<<<<<<< HEAD
 type BattleParticipant struct {
 	ID          pgtype.UUID        `json:"id"`
 	BattleID    pgtype.UUID        `json:"battle_id"`
@@ -43,4 +47,15 @@ type User struct {
 	BattlesWon    int32
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz
+=======
+type User struct {
+	ID            pgtype.UUID        `json:"id"`
+	Username      string             `json:"username"`
+	DisplayName   string             `json:"display_name"`
+	EloRating     int32              `json:"elo_rating"`
+	BattlesPlayed int32              `json:"battles_played"`
+	BattlesWon    int32              `json:"battles_won"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+>>>>>>> main
 }

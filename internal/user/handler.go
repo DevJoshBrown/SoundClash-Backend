@@ -2,6 +2,7 @@ package user
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
@@ -26,6 +27,7 @@ func (h Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	u, err := h.queries.CreateUser(r.Context(), params)
 	if err != nil {
+		log.Printf("createUser error: %v", err)
 		http.Error(w, "failed to create user", http.StatusInternalServerError)
 		return
 	}
@@ -51,6 +53,6 @@ func (h Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-type", "encoding/json")
+	w.Header().Set("Content-type", "application/json")
 	json.NewEncoder(w).Encode(u)
 }
