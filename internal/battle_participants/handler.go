@@ -92,8 +92,8 @@ func (h Handler) SubmitParticipant(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check the battle is still in progress
-	if b.Status != "in_progress" {
-		http.Error(w, "battle is no longer in progress", http.StatusBadRequest)
+	if b.Status != "upload" {
+		http.Error(w, "battle is not accepting uploads at this time", http.StatusBadRequest)
 		return
 	} else {
 		var body struct {
@@ -116,4 +116,26 @@ func (h Handler) SubmitParticipant(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(updated)
 
 	}
+}
+
+func (h Handler) ListParticipants(w http.ResponseWriter, r *http.Request) {
+	battle_id := chi.URLParam(r, "id")
+	var btl_uid pgtype.UUID
+	if err := btl_uid.Scan(battle_id); err != nil {
+		http.Error(w, "failed to scan battle_id", http.StatusBadRequest)
+		return
+	}
+
+	participants, err := h.queries.ListParticipants(r.Context(), btl_uid)
+	if err != nil {
+		http.Error(w, "failed to list participants", http.StatusInternalServerError)
+		return
+	}
+
+	if len(participants) == 0 {
+		participants = []db.BattleParticipant{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(participants)
 }

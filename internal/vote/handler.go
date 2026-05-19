@@ -1,4 +1,4 @@
-package user
+package votes
 
 import (
 	"encoding/json"
@@ -102,4 +102,50 @@ func (h Handler) CastVote(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(vote)
 
+}
+
+func (h Handler) ConfirmVotes(w http.ResponseWriter, r *http.Request) {
+	user_id := r.Header.Get("X-User-ID")
+	var usr_uid pgtype.UUID
+	if err := usr_uid.Scan(user_id); err != nil {
+		http.Error(w, "invalid user id", http.StatusBadRequest)
+		return
+	}
+
+	battle_id := chi.URLParam(r, "id")
+	var btl_uid pgtype.UUID
+
+	if err := btl_uid.Scan(battle_id); err != nil {
+		http.Error(w, "invalid battle id", http.StatusBadRequest)
+		return
+	}
+
+	b, err := h.queries.GetBattle(r.Context(), btl_uid)
+	if err != nil {
+		http.Error(w, "battle not found", http.StatusNotFound)
+		return
+	}
+
+	participant, err := h.queries.GetParticipant(r.Context(), db.GetParticipantParams{
+		BattleID: btl_uid,
+		UserID:   usr_uid,
+	})
+	if err != nil {
+		http.Error(w, "participant not found", http.StatusBadRequest)
+		return
+	}
+
+	if b.Status != "voting" {
+		http.Error(w, "voting is not currently active", http.StatusBadRequest)
+		return
+	}
+
+	participant, err = h.queries.ConfirmVotes(r.Context(), participant.ID)
+	if err != nil {
+		http.Error(w, "failed to confirm votes", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(participant)
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/DevJoshBrown/BeatBattler/internal/user"
+	votes "github.com/DevJoshBrown/BeatBattler/internal/vote"
 	"github.com/DevJoshBrown/BeatBattler/pkg/storage/postgres"
 	"github.com/go-chi/chi/v5"
 )
@@ -34,6 +35,7 @@ func main() {
 	userHandler := user.NewHandler(queries)
 	battleHandler := battle.NewHandler(queries)
 	participantHandler := battle_participants.NewHandler(queries)
+	voteHandler := votes.NewHandler(queries)
 
 	// Register routes on chi router
 	r := chi.NewRouter()
@@ -52,9 +54,15 @@ func main() {
 	r.Post("/battles", battleHandler.CreateBattle)
 	r.Get("/battles", battleHandler.ListBattles)
 	r.Get("/battles/{id}", battleHandler.GetBattle)
+	r.Post("/battles/{id}/start", battleHandler.StartBattle)
+	r.Get("/battles/{id}/results", battleHandler.GetResults)
 	// participants
 	r.Post("/battles/{id}/join", participantHandler.CreateParticipant)
 	r.Post("/battles/{id}/submit", participantHandler.SubmitParticipant)
+	r.Get("/battles/{id}/participants", participantHandler.ListParticipants)
+	// votes
+	r.Post("/battles/{id}/vote", voteHandler.CastVote)
+	r.Post("/battles/{id}/confirm-votes", voteHandler.ConfirmVotes)
 
 	// Start server
 	addr := ":" + cfg.Port
