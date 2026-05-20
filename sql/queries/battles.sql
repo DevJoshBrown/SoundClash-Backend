@@ -17,13 +17,13 @@ SET status = $2
 WHERE id = $1
 RETURNING *;
 
--- name: UpdateListingIndex :one
+-- name: UpdateListeningIndex :one
 UPDATE battles
 SET current_listening_index = $2
 WHERE id = $1
 RETURNING *;
 
--- name: UpdateListingOrder :one
+-- name: UpdateListeningOrder :one
 UPDATE battles
 SET listening_order = $2
 WHERE id = $1

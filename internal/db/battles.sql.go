@@ -152,20 +152,20 @@ func (q *Queries) UpdateBattleStatus(ctx context.Context, arg UpdateBattleStatus
 	return i, err
 }
 
-const updateListingIndex = `-- name: UpdateListingIndex :one
+const updateListeningIndex = `-- name: UpdateListeningIndex :one
 UPDATE battles
 SET current_listening_index = $2
 WHERE id = $1
 RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
 `
 
-type UpdateListingIndexParams struct {
+type UpdateListeningIndexParams struct {
 	ID                    pgtype.UUID `json:"id"`
 	CurrentListeningIndex int32       `json:"current_listening_index"`
 }
 
-func (q *Queries) UpdateListingIndex(ctx context.Context, arg UpdateListingIndexParams) (Battle, error) {
-	row := q.db.QueryRow(ctx, updateListingIndex, arg.ID, arg.CurrentListeningIndex)
+func (q *Queries) UpdateListeningIndex(ctx context.Context, arg UpdateListeningIndexParams) (Battle, error) {
+	row := q.db.QueryRow(ctx, updateListeningIndex, arg.ID, arg.CurrentListeningIndex)
 	var i Battle
 	err := row.Scan(
 		&i.ID,
@@ -185,20 +185,20 @@ func (q *Queries) UpdateListingIndex(ctx context.Context, arg UpdateListingIndex
 	return i, err
 }
 
-const updateListingOrder = `-- name: UpdateListingOrder :one
+const updateListeningOrder = `-- name: UpdateListeningOrder :one
 UPDATE battles
 SET listening_order = $2
 WHERE id = $1
 RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
 `
 
-type UpdateListingOrderParams struct {
+type UpdateListeningOrderParams struct {
 	ID             pgtype.UUID   `json:"id"`
 	ListeningOrder []pgtype.UUID `json:"listening_order"`
 }
 
-func (q *Queries) UpdateListingOrder(ctx context.Context, arg UpdateListingOrderParams) (Battle, error) {
-	row := q.db.QueryRow(ctx, updateListingOrder, arg.ID, arg.ListeningOrder)
+func (q *Queries) UpdateListeningOrder(ctx context.Context, arg UpdateListeningOrderParams) (Battle, error) {
+	row := q.db.QueryRow(ctx, updateListeningOrder, arg.ID, arg.ListeningOrder)
 	var i Battle
 	err := row.Scan(
 		&i.ID,
