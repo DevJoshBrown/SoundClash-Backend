@@ -9,6 +9,7 @@ import (
 	"github.com/DevJoshBrown/BeatBattler/internal/battle_participants"
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
+	"github.com/DevJoshBrown/BeatBattler/internal/queue"
 	"github.com/DevJoshBrown/BeatBattler/internal/scheduler"
 	"github.com/DevJoshBrown/BeatBattler/internal/user"
 	votes "github.com/DevJoshBrown/BeatBattler/internal/vote"
@@ -38,6 +39,7 @@ func main() {
 	battleHandler := battle.NewHandler(queries, sched)
 	participantHandler := battle_participants.NewHandler(queries)
 	voteHandler := votes.NewHandler(queries)
+	queueHandler := queue.NewHandler(queries)
 
 	// Register routes on chi router
 	r := chi.NewRouter()
@@ -58,6 +60,10 @@ func main() {
 	r.Get("/battles/{id}", battleHandler.GetBattle)
 	r.Post("/battles/{id}/start", battleHandler.StartBattle)
 	r.Get("/battles/{id}/results", battleHandler.GetResults)
+	// matchmaking queue
+	r.Post("/queue", queueHandler.Join)
+	r.Delete("/queue", queueHandler.Leave)
+	r.Get("/queue", queueHandler.Status)
 	// participants
 	r.Post("/battles/{id}/join", participantHandler.CreateParticipant)
 	r.Post("/battles/{id}/submit", participantHandler.SubmitParticipant)
