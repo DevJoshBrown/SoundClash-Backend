@@ -2,6 +2,7 @@ package battle_participants
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -42,6 +43,7 @@ func (h Handler) CreateParticipant(w http.ResponseWriter, r *http.Request) {
 
 	p, err := h.queries.CreateParticipant(r.Context(), params)
 	if err != nil {
+		log.Printf("error: %v", err)
 		http.Error(w, "failed to join battle", http.StatusInternalServerError)
 		return
 	}

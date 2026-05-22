@@ -9,6 +9,7 @@ import (
 	"github.com/DevJoshBrown/BeatBattler/internal/battle_participants"
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
+	"github.com/DevJoshBrown/BeatBattler/internal/scheduler"
 	"github.com/DevJoshBrown/BeatBattler/internal/user"
 	votes "github.com/DevJoshBrown/BeatBattler/internal/vote"
 	"github.com/DevJoshBrown/BeatBattler/pkg/storage/postgres"
@@ -33,7 +34,8 @@ func main() {
 	//create queries & handlers (internal/db - sqlc generated)
 	queries := db.New(pool)
 	userHandler := user.NewHandler(queries)
-	battleHandler := battle.NewHandler(queries)
+	sched := scheduler.NewScheduler(queries, pool)
+	battleHandler := battle.NewHandler(queries, sched)
 	participantHandler := battle_participants.NewHandler(queries)
 	voteHandler := votes.NewHandler(queries)
 

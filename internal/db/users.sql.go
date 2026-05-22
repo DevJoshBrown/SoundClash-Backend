@@ -59,6 +59,52 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 	return i, err
 }
 
+const incrementBattlesPlayed = `-- name: IncrementBattlesPlayed :one
+UPDATE users
+SET battles_played = battles_played + 1
+WHERE id = $1
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, created_at, updated_at
+`
+
+func (q *Queries) IncrementBattlesPlayed(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, incrementBattlesPlayed, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.EloRating,
+		&i.BattlesPlayed,
+		&i.BattlesWon,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const incrementBattlesWon = `-- name: IncrementBattlesWon :one
+UPDATE users
+SET battles_won = battles_won + 1
+WHERE id = $1
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, created_at, updated_at
+`
+
+func (q *Queries) IncrementBattlesWon(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, incrementBattlesWon, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.EloRating,
+		&i.BattlesPlayed,
+		&i.BattlesWon,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateUserElo = `-- name: UpdateUserElo :one
 UPDATE users
 SET elo_rating = $2

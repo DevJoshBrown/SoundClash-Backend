@@ -1,21 +1,25 @@
 package battle
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
+	"github.com/DevJoshBrown/BeatBattler/internal/scheduler"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Handler struct {
-	queries *db.Queries
+	queries   *db.Queries
+	scheduler *scheduler.Scheduler
 }
 
-func NewHandler(queries *db.Queries) *Handler {
-	return &Handler{queries: queries}
+func NewHandler(queries *db.Queries, s *scheduler.Scheduler) *Handler {
+	return &Handler{queries: queries, scheduler: s}
 }
 
 func (h Handler) CreateBattle(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +45,14 @@ func (h Handler) CreateBattle(w http.ResponseWriter, r *http.Request) {
 		log.Printf("CreateBattle error: %v", err)
 		http.Error(w, "failed to create battle", http.StatusInternalServerError)
 		return
+	}
+
+	_, err = h.queries.CreateParticipant(r.Context(), db.CreateParticipantParams{
+		BattleID: b.ID,
+		UserID:   uid,
+	})
+	if err != nil {
+		log.Printf("CreateBattle: failed to auto-join creator: %v", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -135,6 +147,8 @@ func (h Handler) StartBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.scheduler.Run(context.Background(), btl_uid, time.Duration(b.DurationMinutes)*time.Minute)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(battleStatus)
 
@@ -208,9 +222,15 @@ func (h Handler) GetResults(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// assign positions (1-indexed)
+	// assign positions — tied scores share the same position
 	for i := range results {
-		results[i].Position = i + 1
+		if i == 0 {
+			results[i].Position = 1
+		} else if results[i].AverageScore == results[i-1].AverageScore {
+			results[i].Position = results[i-1].Position
+		} else {
+			results[i].Position = i + 1
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
