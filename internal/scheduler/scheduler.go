@@ -2,12 +2,14 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"time"
 
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
+	"github.com/DevJoshBrown/BeatBattler/internal/hub"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -15,10 +17,11 @@ import (
 type Scheduler struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
+	hubs    *hub.Manager
 }
 
-func NewScheduler(queries *db.Queries, pool *pgxpool.Pool) *Scheduler {
-	return &Scheduler{queries: queries, pool: pool}
+func NewScheduler(queries *db.Queries, pool *pgxpool.Pool, hubs *hub.Manager) *Scheduler {
+	return &Scheduler{queries: queries, pool: pool, hubs: hubs}
 }
 
 func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time.Duration) {
@@ -26,16 +29,16 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 
 	go func() {
 
-		// UPLOAD
 		select {
 		case <-time.After(duration):
 			_, err := s.queries.UpdateBattleStatus(ctx, db.UpdateBattleStatusParams{
 				ID: battleID, Status: "upload",
 			})
 			if err != nil {
-				log.Printf("scheduler: failed tp update battle status to upload %v: %v", battleID, err)
+				log.Printf("scheduler: failed to update battle status to upload %v: %v", battleID, err)
 			}
 			log.Printf("scheduler: battle %v -> upload", battleID)
+			s.broadcastStage(battleID, "upload")
 		case <-ctx.Done():
 			return
 		}
@@ -52,6 +55,7 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 				return
 			}
 			log.Printf("scheduler: battle %v -> listening", battleID)
+			s.broadcastStage(battleID, "listening")
 
 			participants, err := s.queries.ListParticipants(ctx, battleID)
 			if err != nil {
@@ -102,6 +106,7 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 				return
 			}
 			log.Printf("scheduler: battle %v -> voting", battleID)
+			s.broadcastStage(battleID, "voting")
 
 			deadline := time.After(60 * time.Second)
 			for {
@@ -140,6 +145,7 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 				return
 			}
 			log.Printf("scheduler: battle %v -> results", battleID)
+			s.broadcastStage(battleID, "results")
 
 			battle, err := s.queries.GetBattle(ctx, battleID)
 			if err != nil {
@@ -277,4 +283,9 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 
 	}()
 
+}
+
+func (s *Scheduler) broadcastStage(battleID pgtype.UUID, status string) {
+	msg := fmt.Sprintf(`{type":"stage_change","status":"%s"}`, status)
+	s.hubs.Broadcast(battleID, []byte(msg))
 }

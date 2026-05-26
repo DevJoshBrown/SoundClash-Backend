@@ -1,0 +1,411 @@
+================================================================
+BEATBATTLER  —  FRONTEND PLAN
+================================================================
+
+A reference document for the frontend repo (separate from this
+backend repo). Goal: a wireframe-quality but responsive and
+robust React client that exercises every backend feature, written
+incrementally as the backend matures.
+
+Target environment: DESKTOP / LAPTOP first. Beat production
+happens in a DAW which means real users are on full-size screens.
+Mobile responsiveness should be "doesn't break at small sizes,"
+not "designed for phones."
+
+
+================================================================
+STACK
+================================================================
+
+  Framework       : Vite + React + TypeScript
+  Routing         : React Router
+  Styling         : Tailwind CSS
+  Data fetching   : TanStack Query (React Query)
+  HTTP client     : fetch wrapped in a small helper
+  Forms           : plain controlled inputs, react-hook-form later
+  Local state     : useState / useReducer (no Redux / Zustand)
+  Audio           : native <audio> tag, no library
+  Realtime        : polling first, swap to WebSocket later
+
+
+WHY VITE (not Next.js):
+
+  - No SSR needed. BeatBattler is a logged-in client app with
+    no SEO surface inside the app itself.
+  - Faster dev loop than Next.js (near-instant HMR).
+  - Simpler mental model for a React learner — fewer framework
+    conventions to absorb on top of plain React.
+  - Backend is the source of truth, no need for a Node server
+    in front of it.
+
+WHY REACT ROUTER (not file-based routing):
+
+  - One library, well documented, used everywhere.
+  - Routes are just code, easy to inspect.
+
+WHY TYPESCRIPT:
+
+  - Catches a lot of "undefined is not a function" before you run.
+  - The compiler is your safety net while learning React.
+  - Backend types translate cleanly into TS interfaces.
+
+Repo name suggestion: BeatBattler-web (same GitHub org).
+
+
+================================================================
+PROJECT SETUP  (one-time)
+================================================================
+
+  npm create vite@latest beatbattler-web -- --template react-ts
+  cd beatbattler-web
+  npm install
+  npm install react-router-dom @tanstack/react-query
+  npm install -D tailwindcss postcss autoprefixer
+  npx tailwindcss init -p
+
+Create a file .env at the repo root:
+
+  VITE_API_URL=http://localhost:8080
+
+
+================================================================
+SIX ARCHITECTURAL PATTERNS TO LOCK IN WEEK ONE
+================================================================
+
+These are non-negotiable for "robust." Set them up first and they
+pay dividends for the life of the project.
+
+
+1.  TYPED API CONTRACT
+    --------------------
+
+    Hand-write TypeScript types that mirror the Go structs.
+
+      // src/lib/types.ts
+      export type Battle = {
+        id: string;
+        creator_id: string | null;
+        mode: "ffa" | "ranked";
+        genre: string | null;
+        status:
+          | "waiting" | "forming" | "in_progress"
+          | "upload" | "listening" | "voting"
+          | "results" | "cancelled";
+        duration_minutes: number;
+        max_participants: number;
+        current_listening_index: number;
+        listening_order: string[] | null;
+        started_at: string | null;
+        completed_at: string | null;
+        created_at: string;
+      };
+
+    When the backend changes a shape, update the TS type too.
+    Keep them in sync by hand for now.
+
+
+2.  CENTRALISED API CLIENT
+    ----------------------
+
+      // src/lib/api.ts
+      const BASE = import.meta.env.VITE_API_URL;
+
+      export async function api<T>(
+        path: string,
+        init: RequestInit = {}
+      ): Promise<T> {
+        const userId = localStorage.getItem("devUserId") ?? "";
+        const res = await fetch(BASE + path, {
+          ...init,
+          headers: {
+            "Content-Type": "application/json",
+            "X-User-ID": userId,
+            ...(init.headers ?? {}),
+          },
+        });
+        if (!res.ok) {
+          throw new Error(
+            (await res.text()) || "request failed: " + res.status
+          );
+        }
+        if (res.status === 204) return undefined as T;
+        return res.json();
+      }
+
+    Every component goes through this. Single place to swap
+    dev auth for Clerk later.
+
+
+3.  STAGE-DRIVEN UI
+    ---------------
+
+    The live battle page is the most complex screen. It should
+    be a single component that renders different sub-components
+    based on battle.status:
+
+      switch (battle.status) {
+        case "waiting":     return <WaitingRoom    battle={battle} />;
+        case "in_progress": return <ProductionStage battle={battle} />;
+        case "upload":      return <UploadStage    battle={battle} />;
+        case "listening":   return <ListeningStage battle={battle} />;
+        case "voting":      return <VotingStage    battle={battle} />;
+        case "results":     return <ResultsView    battle={battle} />;
+      }
+
+    This mirrors how the backend models the battle and prevents
+    conditional spaghetti.
+
+
+4.  POLLING PATTERN
+    ---------------
+
+      const { data: battle } = useQuery({
+        queryKey: ["battle", id],
+        queryFn: () => api<Battle>("/battles/" + id),
+        refetchInterval: 2000,
+      });
+
+    When WebSockets land, this becomes a hook that subscribes to
+    a socket and writes into React Query's cache via
+    queryClient.setQueryData. The stage components don't change.
+
+
+5.  LOADING AND ERROR STATES EVERYWHERE
+    -----------------------------------
+
+    Every component that reads server data shows three states:
+
+      - loading skeleton
+      - error message
+      - real content
+
+    Never assume data is there. React Query exposes isLoading,
+    error, data — use all three.
+
+
+6.  DESKTOP-FIRST, NOT FRAGILE AT SMALLER SIZES
+    -------------------------------------------
+
+    Design at 1280x800 and up. Make sure nothing breaks
+    catastrophically below 1024px. No phone-first layouts.
+    The product is producers in DAWs, not commuters.
+
+
+================================================================
+PHASE PLAN  (mirrors backend phases)
+================================================================
+
+
+F1  —  SKELETON + DEV AUTH                            (1–2 days)
+----------------------------------------------------------------
+
+  - Vite project up, React Router configured
+  - API helper, types, React Query provider mounted
+  - Dev login page: input box, save typed UUID to localStorage,
+    redirect to home
+  - Header showing "logged in as {userId}", logout button
+    (clears localStorage)
+  - Basic layout shell (header + main content area)
+
+  Backend status: READY  (all of Phase B done)
+
+
+F2  —  BATTLE BROWSER + CUSTOM BATTLES                (3–4 days)
+----------------------------------------------------------------
+
+  - /battles            : list battles with status badges
+  - /battles/new        : form to create a battle
+                          (mode, genre, duration, max_participants)
+  - /battles/:id        : battle detail page; initial version
+                          shows participant list + join button
+  - Join battle button
+  - Start battle button (visible to creator when waiting)
+
+  Backend status: READY  (Phase C and D)
+
+
+F3  —  LIVE BATTLE STAGE UI                            (1 week)
+----------------------------------------------------------------
+
+  - Build the stage-driven battle page properly
+  - Each stage component: timer, "what to do now" message,
+    action buttons
+  - Submit beat URL form during upload stage
+  - Listening view (current index of total)
+  - Voting view: render other participants as cards with
+    a 1–5 score selector
+  - Confirm-votes button
+  - Results view: sorted leaderboard
+  - Poll battle state every 2 seconds
+
+  Backend status: READY
+
+
+F4  —  QUEUE / RANKED                                 (2–3 days)
+----------------------------------------------------------------
+
+  - /queue page: pick genres, click "Find Match"
+  - While in queue: status display (elapsed time), leave button
+  - Poll queue status
+  - When queue ticket goes 404, look for a battle where the
+    user is a participant, redirect there
+
+  Backend status: READY
+
+
+F5  —  PROFILE PAGES + POLISH                         (2–3 days)
+----------------------------------------------------------------
+
+  - /users/:id : display name, ELO, battles played / won,
+                 win rate
+  - Past battles list  (NOTE: needs a new backend query —
+                        "list battles for user")
+  - Loading skeletons everywhere
+  - Error toasts
+  - Empty states
+
+  Backend gap: "list battles for user" query doesn't exist
+               yet. Trivial to add.
+
+
+F6  —  WEBSOCKETS SWAP    (when backend Phase E lands)
+----------------------------------------------------------------
+
+  - Single useBattleSocket(battleId) hook
+  - Subscribes to ws://localhost:8080/battles/{id}/ws
+  - Writes incoming events into React Query cache
+  - Remove the refetchInterval from the battle query
+  - Stage components don't change
+
+
+F7  —  REAL AUDIO + CLERK   (when backend Phase F lands)
+----------------------------------------------------------------
+
+  - Replace beat-URL text input with file picker that
+    POSTs multipart to the upload endpoint
+  - <audio> player in listening stage, autoplay on index change
+  - Swap localStorage dev auth for Clerk's SignIn component
+    and Clerk's user id
+
+
+================================================================
+THINGS TO DEFER  (do NOT build yet)
+================================================================
+
+  - Real designs and styling beyond Tailwind defaults
+  - Animations
+  - Drag and drop
+  - Voice or text chat
+  - Notifications
+  - Internationalization
+  - Dark mode toggle (default to dark, fine)
+  - Profile editing (avatars, bios)
+  - Friends / social graph
+  - Mobile app
+
+
+================================================================
+API CONTRACT  (current backend)
+================================================================
+
+All authenticated requests need:   X-User-ID: <uuid>
+Errors come back as PLAIN TEXT with a 4xx / 5xx status code,
+not JSON. The api() helper handles this.
+
+
+  POST    /users
+            create user
+            body: { username, display_name }
+
+  GET     /users/:id
+            fetch user
+
+  POST    /battles
+            create custom battle
+            header: X-User-ID
+            body:   { mode, genre, duration_minutes,
+                      max_participants }
+
+  GET     /battles
+            list battles
+
+  GET     /battles/:id
+            fetch battle (poll this for stage)
+
+  POST    /battles/:id/start
+            creator starts battle
+            header: X-User-ID
+
+  GET     /battles/:id/results
+            final leaderboard
+            valid only when status == "results"
+
+  POST    /battles/:id/join
+            join as participant
+            header: X-User-ID
+
+  POST    /battles/:id/submit
+            submit beat URL
+            header: X-User-ID
+            body:   { beat_url }
+            status must be "upload"
+
+  GET     /battles/:id/participants
+            list participants
+
+  POST    /battles/:id/vote
+            cast or update a vote
+            body: { participant_id, score }   (1–5)
+
+  POST    /battles/:id/confirm-votes
+            lock in your votes
+
+  POST    /queue
+            join the ranked queue
+            body: { genres: string[] }
+
+  DELETE  /queue
+            leave the queue
+
+  GET     /queue
+            current queue status (404 if not queued)
+
+
+================================================================
+OPEN QUESTIONS FOR THE FRONTEND ENGINEER
+================================================================
+
+  1.  Component library?   Suggest none for v1 (Tailwind + raw
+      elements). shadcn/ui is the obvious upgrade path.
+
+  2.  Testing?   Probably skip for v1. Add Playwright for the
+      happy path before scale.
+
+  3.  Hosting?   Vercel, Netlify, or Cloudflare Pages all work
+      for a Vite SPA. Backend hosting is a separate decision.
+
+  4.  CI?   GitHub Actions running `tsc --noEmit` plus
+      `npm run build` per PR is the minimum.
+
+  5.  Type sharing with Go backend?   Manual TS for now. If
+      churn becomes painful, generate from sqlc output or
+      expose an OpenAPI schema from the backend.
+
+
+================================================================
+COORDINATION WITH THE BACKEND REPO
+================================================================
+
+  - Backend repo:  BeatBattler        (this repo)
+  - Frontend repo: BeatBattler-web    (to be created)
+
+  - Backend must run on localhost:8080 for the frontend's
+    default config to work.
+
+  - Backend CORS is configured to allow http://localhost:3000
+    (Vite's default dev port is 5173 — update CORS to allow
+    BOTH, or change one to match the other).
+
+  - When a backend endpoint shape changes, update both:
+      - the handler / sqlc query in the backend repo
+      - the matching type in BeatBattler-web/src/lib/types.ts

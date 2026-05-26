@@ -9,6 +9,7 @@ import (
 	"github.com/DevJoshBrown/BeatBattler/internal/battle_participants"
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
+	"github.com/DevJoshBrown/BeatBattler/internal/hub"
 	"github.com/DevJoshBrown/BeatBattler/internal/matchmaker"
 	"github.com/DevJoshBrown/BeatBattler/internal/queue"
 	"github.com/DevJoshBrown/BeatBattler/internal/scheduler"
@@ -16,6 +17,7 @@ import (
 	votes "github.com/DevJoshBrown/BeatBattler/internal/vote"
 	"github.com/DevJoshBrown/BeatBattler/pkg/storage/postgres"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 )
 
 func main() {
@@ -34,10 +36,11 @@ func main() {
 	defer pool.Close()
 
 	//create queries & handlers (internal/db - sqlc generated)
+	hubManager := hub.NewManager()
 	queries := db.New(pool)
 	userHandler := user.NewHandler(queries)
-	sched := scheduler.NewScheduler(queries, pool)
-	battleHandler := battle.NewHandler(queries, sched)
+	sched := scheduler.NewScheduler(queries, pool, hubManager)
+	battleHandler := battle.NewHandler(queries, sched, hubManager)
 	participantHandler := battle_participants.NewHandler(queries)
 	voteHandler := votes.NewHandler(queries)
 	queueHandler := queue.NewHandler(queries)
@@ -49,6 +52,14 @@ func main() {
 	// Register routes on chi router
 	r := chi.NewRouter()
 
+	// Add CORS middleware
+
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"http://localhost:5173"},
+		AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS"},
+		AllowedHeaders: []string{"Content-Type", "X-User-ID"},
+	}))
+
 	// Check server health
 	r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -56,6 +67,8 @@ func main() {
 	})
 
 	// Handlers
+	// WebSocket
+	r.Get("/battles/{id}/ws", battleHandler.ServeWS)
 	// users
 	r.Post("/users", userHandler.CreateUser)
 	r.Get("/users/{id}", userHandler.GetUser)

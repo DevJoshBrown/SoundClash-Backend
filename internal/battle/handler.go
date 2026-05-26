@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
+	"github.com/DevJoshBrown/BeatBattler/internal/hub"
 	"github.com/DevJoshBrown/BeatBattler/internal/scheduler"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -16,10 +17,11 @@ import (
 type Handler struct {
 	queries   *db.Queries
 	scheduler *scheduler.Scheduler
+	hubs      *hub.Manager
 }
 
-func NewHandler(queries *db.Queries, s *scheduler.Scheduler) *Handler {
-	return &Handler{queries: queries, scheduler: s}
+func NewHandler(queries *db.Queries, s *scheduler.Scheduler, hubs *hub.Manager) *Handler {
+	return &Handler{queries: queries, scheduler: s, hubs: hubs}
 }
 
 func (h Handler) CreateBattle(w http.ResponseWriter, r *http.Request) {
@@ -235,4 +237,16 @@ func (h Handler) GetResults(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
+}
+
+func (h Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	var btl_uid pgtype.UUID
+	if err := btl_uid.Scan(id); err != nil {
+		http.Error(w, "invalid battle ID", http.StatusBadRequest)
+		return
+	}
+
+	h.hubs.ServeWS(w, r, btl_uid)
 }
