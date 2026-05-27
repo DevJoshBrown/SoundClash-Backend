@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, display_name)
 VALUES ($1, $2)
-RETURNING id, username, display_name, elo_rating, battles_played, battles_won, created_at, updated_at
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -32,6 +32,29 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.EloRating,
 		&i.BattlesPlayed,
 		&i.BattlesWon,
+		&i.ClerkID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByClerkID = `-- name: GetUserByClerkID :one
+SELECT id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at FROM users
+WHERE clerk_id = $1
+`
+
+func (q *Queries) GetUserByClerkID(ctx context.Context, clerkID pgtype.Text) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByClerkID, clerkID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.EloRating,
+		&i.BattlesPlayed,
+		&i.BattlesWon,
+		&i.ClerkID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -39,7 +62,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, display_name, elo_rating, battles_played, battles_won, created_at, updated_at FROM users
+SELECT id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at FROM users
 WHERE id = $1
 `
 
@@ -53,6 +76,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.EloRating,
 		&i.BattlesPlayed,
 		&i.BattlesWon,
+		&i.ClerkID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -63,7 +87,7 @@ const incrementBattlesPlayed = `-- name: IncrementBattlesPlayed :one
 UPDATE users
 SET battles_played = battles_played + 1
 WHERE id = $1
-RETURNING id, username, display_name, elo_rating, battles_played, battles_won, created_at, updated_at
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
 `
 
 func (q *Queries) IncrementBattlesPlayed(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -76,6 +100,7 @@ func (q *Queries) IncrementBattlesPlayed(ctx context.Context, id pgtype.UUID) (U
 		&i.EloRating,
 		&i.BattlesPlayed,
 		&i.BattlesWon,
+		&i.ClerkID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -86,7 +111,7 @@ const incrementBattlesWon = `-- name: IncrementBattlesWon :one
 UPDATE users
 SET battles_won = battles_won + 1
 WHERE id = $1
-RETURNING id, username, display_name, elo_rating, battles_played, battles_won, created_at, updated_at
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
 `
 
 func (q *Queries) IncrementBattlesWon(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -99,6 +124,7 @@ func (q *Queries) IncrementBattlesWon(ctx context.Context, id pgtype.UUID) (User
 		&i.EloRating,
 		&i.BattlesPlayed,
 		&i.BattlesWon,
+		&i.ClerkID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -109,7 +135,7 @@ const updateUserElo = `-- name: UpdateUserElo :one
 UPDATE users
 SET elo_rating = $2
 WHERE id = $1
-RETURNING id, username, display_name, elo_rating, battles_played, battles_won, created_at, updated_at
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
 `
 
 type UpdateUserEloParams struct {
@@ -127,6 +153,38 @@ func (q *Queries) UpdateUserElo(ctx context.Context, arg UpdateUserEloParams) (U
 		&i.EloRating,
 		&i.BattlesPlayed,
 		&i.BattlesWon,
+		&i.ClerkID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertUserByClerkID = `-- name: UpsertUserByClerkID :one
+INSERT INTO users (username, display_name, clerk_id)
+VALUES ($1, $2, $3)
+ON CONFLICT (clerk_id) DO UPDATE
+SET clerk_id = EXCLUDED.clerk_id
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
+`
+
+type UpsertUserByClerkIDParams struct {
+	Username    string      `json:"username"`
+	DisplayName string      `json:"display_name"`
+	ClerkID     pgtype.Text `json:"clerk_id"`
+}
+
+func (q *Queries) UpsertUserByClerkID(ctx context.Context, arg UpsertUserByClerkIDParams) (User, error) {
+	row := q.db.QueryRow(ctx, upsertUserByClerkID, arg.Username, arg.DisplayName, arg.ClerkID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.EloRating,
+		&i.BattlesPlayed,
+		&i.BattlesWon,
+		&i.ClerkID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

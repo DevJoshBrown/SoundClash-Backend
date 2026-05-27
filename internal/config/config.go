@@ -7,15 +7,17 @@ import (
 )
 
 type Config struct {
-	Port        string
-	DatabaseURL string
+	Port           string
+	DatabaseURL    string
+	ClerkSecretKey string
 }
 
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 	cfg := &Config{
-		Port:        getEnv("PORT", "8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
+		Port:           getEnv("PORT", "8080"),
+		DatabaseURL:    os.Getenv("DATABASE_URL"),
+		ClerkSecretKey: os.Getenv("CLERK_SECRET_KEY"),
 	}
 
 	return cfg, nil

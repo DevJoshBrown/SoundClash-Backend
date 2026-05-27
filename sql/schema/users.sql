@@ -5,6 +5,7 @@ CREATE TABLE users (
     elo_rating INTEGER NOT NULL DEFAULT 1000,
     battles_played INTEGER NOT NULL DEFAULT 0,
     battles_won INTEGER NOT NULL DEFAULT 0,
+    clerk_id TEXT UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

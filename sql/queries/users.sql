@@ -24,3 +24,15 @@ UPDATE users
 SET battles_won = battles_won + 1
 WHERE id = $1
 RETURNING *;
+
+-- name: GetUserByClerkID :one
+SELECT * FROM users
+WHERE clerk_id = $1;
+
+-- name: UpsertUserByClerkID :one
+INSERT INTO users (username, display_name, clerk_id)
+VALUES ($1, $2, $3)
+ON CONFLICT (clerk_id) DO UPDATE
+SET clerk_id = EXCLUDED.clerk_id,
+display_name = EXCLUDED.display_name
+RETURNING *;

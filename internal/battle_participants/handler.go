@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/DevJoshBrown/BeatBattler/internal/auth"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -22,11 +23,9 @@ func NewHandler(queries *db.Queries) *Handler {
 func (h Handler) CreateParticipant(w http.ResponseWriter, r *http.Request) {
 	var params db.CreateParticipantParams
 
-	user_id := r.Header.Get("X-User-ID")
-	var usr_uid pgtype.UUID
-
-	if err := usr_uid.Scan(user_id); err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -38,7 +37,7 @@ func (h Handler) CreateParticipant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params.UserID = usr_uid
+	params.UserID = user.ID
 	params.BattleID = btl_uid
 
 	p, err := h.queries.CreateParticipant(r.Context(), params)
@@ -56,13 +55,9 @@ func (h Handler) CreateParticipant(w http.ResponseWriter, r *http.Request) {
 
 func (h Handler) SubmitParticipant(w http.ResponseWriter, r *http.Request) {
 
-	// Get User
-	user_id := r.Header.Get("X-User-ID")
-
-	// convert id string to a pgtype uid
-	var user_uid pgtype.UUID
-	if err := user_uid.Scan(user_id); err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -83,7 +78,7 @@ func (h Handler) SubmitParticipant(w http.ResponseWriter, r *http.Request) {
 
 	params := db.GetParticipantParams{
 		BattleID: battle_uid,
-		UserID:   user_uid,
+		UserID:   user.ID,
 	}
 
 	// check user is a participant in the battle

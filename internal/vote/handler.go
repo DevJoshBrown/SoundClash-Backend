@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/DevJoshBrown/BeatBattler/internal/auth"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -18,11 +19,10 @@ func NewHandler(queries *db.Queries) *Handler {
 }
 
 func (h Handler) CastVote(w http.ResponseWriter, r *http.Request) {
-	user_id := r.Header.Get("X-User-ID")
-	var usr_uid pgtype.UUID
 
-	if err := usr_uid.Scan(user_id); err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -59,7 +59,7 @@ func (h Handler) CastVote(w http.ResponseWriter, r *http.Request) {
 
 	participant, err := h.queries.GetParticipant(r.Context(), db.GetParticipantParams{
 		BattleID: btl_uid,
-		UserID:   usr_uid,
+		UserID:   user.ID,
 	})
 
 	if err != nil {
@@ -72,7 +72,7 @@ func (h Handler) CastVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if participant.UserID == usr_uid {
+	if participant.UserID == user.ID {
 		http.Error(w, "self vote not allowed", http.StatusForbidden)
 		return
 	}
@@ -89,7 +89,7 @@ func (h Handler) CastVote(w http.ResponseWriter, r *http.Request) {
 
 	vote, err := h.queries.UpsertVote(r.Context(), db.UpsertVoteParams{
 		BattleID:              btl_uid,
-		VoterID:               usr_uid,
+		VoterID:               user.ID,
 		VotedForParticipantID: participant_uid,
 		Score:                 body.Score,
 	})
@@ -105,10 +105,9 @@ func (h Handler) CastVote(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) ConfirmVotes(w http.ResponseWriter, r *http.Request) {
-	user_id := r.Header.Get("X-User-ID")
-	var usr_uid pgtype.UUID
-	if err := usr_uid.Scan(user_id); err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -128,7 +127,7 @@ func (h Handler) ConfirmVotes(w http.ResponseWriter, r *http.Request) {
 
 	participant, err := h.queries.GetParticipant(r.Context(), db.GetParticipantParams{
 		BattleID: btl_uid,
-		UserID:   usr_uid,
+		UserID:   user.ID,
 	})
 	if err != nil {
 		http.Error(w, "participant not found", http.StatusBadRequest)

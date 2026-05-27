@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/DevJoshBrown/BeatBattler/internal/auth"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/DevJoshBrown/BeatBattler/internal/hub"
 	"github.com/DevJoshBrown/BeatBattler/internal/scheduler"
@@ -28,10 +29,9 @@ func (h Handler) CreateBattle(w http.ResponseWriter, r *http.Request) {
 	var params db.CreateBattleParams
 
 	// Scan to UID
-	id := r.Header.Get("X-User-ID")
-	var uid pgtype.UUID
-	if err := uid.Scan(id); err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -40,7 +40,7 @@ func (h Handler) CreateBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params.CreatorID = uid
+	params.CreatorID = user.ID
 
 	b, err := h.queries.CreateBattle(r.Context(), params)
 	if err != nil {
@@ -51,7 +51,7 @@ func (h Handler) CreateBattle(w http.ResponseWriter, r *http.Request) {
 
 	_, err = h.queries.CreateParticipant(r.Context(), db.CreateParticipantParams{
 		BattleID: b.ID,
-		UserID:   uid,
+		UserID:   user.ID,
 	})
 	if err != nil {
 		log.Printf("CreateBattle: failed to auto-join creator: %v", err)
@@ -98,10 +98,10 @@ func (h Handler) ListBattles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) StartBattle(w http.ResponseWriter, r *http.Request) {
-	user_id := r.Header.Get("X-User-ID")
-	var usr_uid pgtype.UUID
-	if err := usr_uid.Scan(user_id); err != nil {
-		http.Error(w, "could not scan user id", http.StatusBadRequest)
+
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h Handler) StartBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if usr_uid != b.CreatorID {
+	if user.ID != b.CreatorID {
 		http.Error(w, "user is not the battle creator", http.StatusForbidden)
 		return
 	}

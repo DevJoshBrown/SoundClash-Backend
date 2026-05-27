@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/DevJoshBrown/BeatBattler/internal/auth"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Handler struct {
@@ -17,10 +17,9 @@ func NewHandler(queries *db.Queries) *Handler {
 }
 
 func (h Handler) Join(w http.ResponseWriter, r *http.Request) {
-	userID := r.Header.Get("X-User-ID")
-	var usr_uid pgtype.UUID
-	if err := usr_uid.Scan(userID); err != nil {
-		http.Error(w, "invalid user id", http.StatusBadRequest)
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -38,7 +37,7 @@ func (h Handler) Join(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ticket, err := h.queries.EnqueueUser(r.Context(), db.EnqueueUserParams{
-		UserID: usr_uid,
+		UserID: user.ID,
 		Genres: body.Genres,
 	})
 
@@ -53,14 +52,13 @@ func (h Handler) Join(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) Leave(w http.ResponseWriter, r *http.Request) {
-	userID := r.Header.Get("X-User-ID")
-	var usr_uid pgtype.UUID
-	if err := usr_uid.Scan(userID); err != nil {
-		http.Error(w, "invalid user_ID", http.StatusBadRequest)
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	if err := h.queries.DequeueUser(r.Context(), usr_uid); err != nil {
+	if err := h.queries.DequeueUser(r.Context(), user.ID); err != nil {
 		http.Error(w, "Failed to remove user from the queue", http.StatusInternalServerError)
 		return
 	}
@@ -69,14 +67,13 @@ func (h Handler) Leave(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h Handler) Status(w http.ResponseWriter, r *http.Request) {
-	userID := r.Header.Get("X-User-ID")
-	var usr_uid pgtype.UUID
-	if err := usr_uid.Scan(userID); err != nil {
-		http.Error(w, "Failed to fetch userID", http.StatusBadRequest)
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	ticket, err := h.queries.GetQueueTicket(r.Context(), usr_uid)
+	ticket, err := h.queries.GetQueueTicket(r.Context(), user.ID)
 	if err != nil {
 		http.Error(w, "not in queue", http.StatusNotFound)
 		return

@@ -48,6 +48,7 @@ type User struct {
 	EloRating     int32              `json:"elo_rating"`
 	BattlesPlayed int32              `json:"battles_played"`
 	BattlesWon    int32              `json:"battles_won"`
+	ClerkID       pgtype.Text        `json:"clerk_id"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
