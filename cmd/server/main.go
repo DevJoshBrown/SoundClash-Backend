@@ -46,7 +46,7 @@ func main() {
 	userHandler := user.NewHandler(queries)
 	sched := scheduler.NewScheduler(queries, pool, hubManager)
 	battleHandler := battle.NewHandler(queries, sched, hubManager)
-	participantHandler := battle_participants.NewHandler(queries)
+	participantHandler := battle_participants.NewHandler(queries, hubManager)
 	voteHandler := votes.NewHandler(queries)
 	queueHandler := queue.NewHandler(queries)
 	audioHandler := audio.NewHandler(queries)
@@ -74,11 +74,12 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	// WebSocket outside auth group — browsers can't set Authorization headers on WS upgrades
+	r.Get("/battles/{id}/ws", battleHandler.ServeWS)
+
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.ClerkAuth)
 		// Handlers
-		// WebSocket
-		r.Get("/battles/{id}/ws", battleHandler.ServeWS)
 		// users
 		r.Post("/users", userHandler.CreateUser)
 		r.Post("/users/sync", userHandler.SyncUser)

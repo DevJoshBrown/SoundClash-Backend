@@ -301,6 +301,6 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 }
 
 func (s *Scheduler) broadcastStage(battleID pgtype.UUID, status string) {
-	msg := fmt.Sprintf(`{type":"stage_change","status":"%s"}`, status)
+	msg := fmt.Sprintf(`{"type":"stage_change","status":"%s"}`, status)
 	s.hubs.Broadcast(battleID, []byte(msg))
 }

@@ -119,6 +119,34 @@ func (q *Queries) ListBattles(ctx context.Context) ([]Battle, error) {
 	return items, nil
 }
 
+const startBattle = `-- name: StartBattle :one
+UPDATE battles
+SET status = 'in_progress', started_at = NOW()
+WHERE id = $1
+RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
+`
+
+func (q *Queries) StartBattle(ctx context.Context, id pgtype.UUID) (Battle, error) {
+	row := q.db.QueryRow(ctx, startBattle, id)
+	var i Battle
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorID,
+		&i.Mode,
+		&i.Genre,
+		&i.SamplePackID,
+		&i.Status,
+		&i.DurationMinutes,
+		&i.MaxParticipants,
+		&i.CurrentListeningIndex,
+		&i.ListeningOrder,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const updateBattleStatus = `-- name: UpdateBattleStatus :one
 UPDATE battles
 SET status = $2

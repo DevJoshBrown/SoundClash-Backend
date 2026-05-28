@@ -139,14 +139,14 @@ func (h Handler) StartBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	battleStatus, err := h.queries.UpdateBattleStatus(r.Context(), db.UpdateBattleStatusParams{
-		ID:     btl_uid,
-		Status: "in_progress",
-	})
+	battleStatus, err := h.queries.StartBattle(r.Context(), btl_uid)
 	if err != nil {
 		http.Error(w, "failed to update battle status", http.StatusInternalServerError)
 		return
 	}
+
+	msg, _ := json.Marshal(map[string]string{"type": "stage_change", "status": "in_progress"})
+	h.hubs.Broadcast(btl_uid, msg)
 
 	h.scheduler.Run(context.Background(), btl_uid, time.Duration(b.DurationMinutes)*time.Minute)
 

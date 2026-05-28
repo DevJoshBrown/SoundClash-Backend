@@ -12,16 +12,18 @@ import (
 	"github.com/DevJoshBrown/BeatBattler/internal/audio"
 	"github.com/DevJoshBrown/BeatBattler/internal/auth"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
+	"github.com/DevJoshBrown/BeatBattler/internal/hub"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Handler struct {
 	queries *db.Queries
+	hubs    *hub.Manager
 }
 
-func NewHandler(queries *db.Queries) *Handler {
-	return &Handler{queries: queries}
+func NewHandler(queries *db.Queries, hubs *hub.Manager) *Handler {
+	return &Handler{queries: queries, hubs: hubs}
 }
 
 func (h Handler) CreateParticipant(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +52,9 @@ func (h Handler) CreateParticipant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to join battle", http.StatusInternalServerError)
 		return
 	}
+
+	msg, _ := json.Marshal(map[string]string{"type": "participant_joined"})
+	h.hubs.Broadcast(btl_uid, msg)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
