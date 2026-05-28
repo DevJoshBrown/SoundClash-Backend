@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
@@ -80,7 +81,7 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 				return
 			}
 
-			for i := range listeningOrder {
+			for i, participantID := range listeningOrder {
 				_, err = s.queries.UpdateListeningIndex(ctx, db.UpdateListeningIndexParams{
 					ID:                    battleID,
 					CurrentListeningIndex: int32(i),
@@ -89,8 +90,20 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 					log.Printf("scheduler: failed to update listening index %v: %v", battleID, err)
 					return
 				}
+
+				p, err := s.queries.GetParticipantByID(ctx, participantID)
+				if err != nil {
+					log.Printf("scheduler: failed to get participant for duration %v: %v", participantID, err)
+					return
+				}
+
+				trackDuration := 45 * time.Second
+				if p.DurationSeconds.Valid {
+					trackDuration = time.Duration(p.DurationSeconds.Int32) * time.Second
+				}
+
 				select {
-				case <-time.After(45 * time.Second):
+				case <-time.After(trackDuration):
 				case <-ctx.Done():
 					return
 				}
@@ -146,6 +159,8 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 			}
 			log.Printf("scheduler: battle %v -> results", battleID)
 			s.broadcastStage(battleID, "results")
+
+			os.RemoveAll(fmt.Sprintf("tmp/%s", battleID))
 
 			battle, err := s.queries.GetBattle(ctx, battleID)
 			if err != nil {

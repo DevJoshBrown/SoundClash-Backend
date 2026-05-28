@@ -2,10 +2,14 @@ package battle_participants
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/DevJoshBrown/BeatBattler/internal/audio"
 	"github.com/DevJoshBrown/BeatBattler/internal/auth"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/go-chi/chi/v5"
@@ -93,24 +97,62 @@ func (h Handler) SubmitParticipant(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "battle is not accepting uploads at this time", http.StatusBadRequest)
 		return
 	} else {
-		var body struct {
-			BeatURL string `json:"beat_url"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+
+		//Set 32MB limit
+		err = r.ParseMultipartForm(32 << 20)
+		if err != nil {
+			http.Error(w, "failed to parse multipart form", http.StatusInternalServerError)
 			return
 		}
-		updated, err := h.queries.UpdateParticipantBeatURL(r.Context(), db.UpdateParticipantBeatURLParams{
+
+		// get the audio from the form
+		file, _, err := r.FormFile("audio")
+		if err != nil {
+			http.Error(w, "failed to read uploaded file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// save file to temp memory
+		tmp, err := os.CreateTemp("", "beat-upload-*.tmp")
+		if err != nil {
+			http.Error(w, "failed to create temp file", http.StatusInternalServerError)
+			return
+		}
+		defer os.Remove(tmp.Name())
+
+		io.Copy(tmp, file)
+		tmp.Close()
+
+		outputDir := fmt.Sprintf("tmp/%s/%s", battle_id, valid_participant.ID)
+		outputPath, duration, err := audio.Transcode(tmp.Name(), outputDir)
+		if err != nil {
+			http.Error(w, "failed to transcode audio", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = h.queries.UpdateParticipantBeatURL(r.Context(), db.UpdateParticipantBeatURLParams{
 			ID:          valid_participant.ID,
-			BeatUrl:     pgtype.Text{String: body.BeatURL, Valid: true},
+			BeatUrl:     pgtype.Text{String: outputPath, Valid: true},
 			SubmittedAt: pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		})
 		if err != nil {
-			http.Error(w, "failed to updated participants beat URL", http.StatusInternalServerError)
+			http.Error(w, "failed to update beat URL", http.StatusInternalServerError)
 			return
 		}
+
+		_, err = h.queries.UpdateParticipantDuration(r.Context(), db.UpdateParticipantDurationParams{
+			ID:              valid_participant.ID,
+			DurationSeconds: pgtype.Int4{Int32: int32(duration), Valid: true},
+		})
+		if err != nil {
+			http.Error(w, "failed to update beat duration", http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(updated)
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(valid_participant)
 
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/DevJoshBrown/BeatBattler/internal/audio"
 	"github.com/DevJoshBrown/BeatBattler/internal/battle"
 	"github.com/DevJoshBrown/BeatBattler/internal/battle_participants"
 	"github.com/DevJoshBrown/BeatBattler/internal/config"
@@ -48,6 +49,7 @@ func main() {
 	participantHandler := battle_participants.NewHandler(queries)
 	voteHandler := votes.NewHandler(queries)
 	queueHandler := queue.NewHandler(queries)
+	audioHandler := audio.NewHandler(queries)
 
 	//matchmaker register
 	mm := matchmaker.New(queries, sched)
@@ -87,6 +89,7 @@ func main() {
 		r.Get("/battles/{id}", battleHandler.GetBattle)
 		r.Post("/battles/{id}/start", battleHandler.StartBattle)
 		r.Get("/battles/{id}/results", battleHandler.GetResults)
+		r.Get("/battles/{id}/audio/{participant_id}", audioHandler.GetTranscodedAudio)
 		// matchmaking queue
 		r.Post("/queue", queueHandler.Join)
 		r.Delete("/queue", queueHandler.Leave)

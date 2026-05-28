@@ -26,3 +26,9 @@ RETURNING *;
 -- name: GetParticipantByID :one
 SELECT * FROM battle_participants
 WHERE id = $1;
+
+-- name: UpdateParticipantDuration :one
+UPDATE battle_participants
+SET duration_seconds = $2
+WHERE id = $1
+RETURNING *;

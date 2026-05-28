@@ -28,7 +28,6 @@ func NewHandler(queries *db.Queries, s *scheduler.Scheduler, hubs *hub.Manager) 
 func (h Handler) CreateBattle(w http.ResponseWriter, r *http.Request) {
 	var params db.CreateBattleParams
 
-	// Scan to UID
 	user, err := auth.GetUserFromRequest(r, h.queries)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
