@@ -46,7 +46,7 @@ func main() {
 	userHandler := user.NewHandler(queries)
 	sched := scheduler.NewScheduler(queries, pool, hubManager)
 	battleHandler := battle.NewHandler(queries, sched, hubManager)
-	participantHandler := battle_participants.NewHandler(queries, hubManager)
+	participantHandler := battle_participants.NewHandler(queries, hubManager, sched)
 	voteHandler := votes.NewHandler(queries)
 	queueHandler := queue.NewHandler(queries)
 	audioHandler := audio.NewHandler(queries)
@@ -76,6 +76,7 @@ func main() {
 
 	// WebSocket outside auth group — browsers can't set Authorization headers on WS upgrades
 	r.Get("/battles/{id}/ws", battleHandler.ServeWS)
+	r.Get("/battles/{id}/audio/{participant_id}", audioHandler.GetTranscodedAudio)
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.ClerkAuth)
@@ -90,7 +91,7 @@ func main() {
 		r.Get("/battles/{id}", battleHandler.GetBattle)
 		r.Post("/battles/{id}/start", battleHandler.StartBattle)
 		r.Get("/battles/{id}/results", battleHandler.GetResults)
-		r.Get("/battles/{id}/audio/{participant_id}", audioHandler.GetTranscodedAudio)
+		r.Delete("/battles/{id}", battleHandler.CancelBattle)
 		// matchmaking queue
 		r.Post("/queue", queueHandler.Join)
 		r.Delete("/queue", queueHandler.Leave)
@@ -99,9 +100,13 @@ func main() {
 		r.Post("/battles/{id}/join", participantHandler.CreateParticipant)
 		r.Post("/battles/{id}/submit", participantHandler.SubmitParticipant)
 		r.Get("/battles/{id}/participants", participantHandler.ListParticipants)
+		r.Delete("/battles/{id}/leave", participantHandler.LeaveParticipant)
+		r.Post("/battles/{id}/finish-early", participantHandler.FinishEarly)
 		// votes
 		r.Post("/battles/{id}/vote", voteHandler.CastVote)
 		r.Post("/battles/{id}/confirm-votes", voteHandler.ConfirmVotes)
+		r.Post("/battles/{id}/unconfirm-votes", voteHandler.UnconfirmVotes)
+
 	})
 
 	// Start server

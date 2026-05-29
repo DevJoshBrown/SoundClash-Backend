@@ -11,7 +11,7 @@ import (
 )
 
 func Transcode(inputPath string, outputDir string) (outputPath string, durationSeconds int, err error) {
-	filename := "output.aac"
+	filename := "output.m4a"
 
 	outputFilePath := filepath.Join(outputDir, filename)
 

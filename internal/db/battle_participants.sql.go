@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const allFinishedEarly = `-- name: AllFinishedEarly :one
+SELECT COUNT(*) = COUNT(*) FILTER (WHERE finished_early = TRUE)
+FROM battle_participants
+WHERE battle_id = $1
+`
+
+func (q *Queries) AllFinishedEarly(ctx context.Context, battleID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, allFinishedEarly, battleID)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const confirmVotes = `-- name: ConfirmVotes :one
 UPDATE battle_participants
 SET votes_confirmed = TRUE
@@ -140,6 +153,65 @@ func (q *Queries) ListParticipants(ctx context.Context, battleID pgtype.UUID) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const markFinishedEarly = `-- name: MarkFinishedEarly :exec
+UPDATE battle_participants
+SET finished_early = TRUE
+WHERE battle_id = $1 AND user_id = $2
+`
+
+type MarkFinishedEarlyParams struct {
+	BattleID pgtype.UUID `json:"battle_id"`
+	UserID   pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) MarkFinishedEarly(ctx context.Context, arg MarkFinishedEarlyParams) error {
+	_, err := q.db.Exec(ctx, markFinishedEarly, arg.BattleID, arg.UserID)
+	return err
+}
+
+const removeParticipant = `-- name: RemoveParticipant :exec
+DELETE FROM battle_participants
+WHERE battle_id = $1 AND user_id = $2
+`
+
+type RemoveParticipantParams struct {
+	BattleID pgtype.UUID `json:"battle_id"`
+	UserID   pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) RemoveParticipant(ctx context.Context, arg RemoveParticipantParams) error {
+	_, err := q.db.Exec(ctx, removeParticipant, arg.BattleID, arg.UserID)
+	return err
+}
+
+const unconfirmVotes = `-- name: UnconfirmVotes :one
+UPDATE battle_participants
+SET votes_confirmed = false
+WHERE battle_id = $1 AND user_id = $2
+RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed
+`
+
+type UnconfirmVotesParams struct {
+	BattleID pgtype.UUID `json:"battle_id"`
+	UserID   pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) UnconfirmVotes(ctx context.Context, arg UnconfirmVotesParams) (BattleParticipant, error) {
+	row := q.db.QueryRow(ctx, unconfirmVotes, arg.BattleID, arg.UserID)
+	var i BattleParticipant
+	err := row.Scan(
+		&i.ID,
+		&i.BattleID,
+		&i.UserID,
+		&i.BeatUrl,
+		&i.JoinedAt,
+		&i.DurationSeconds,
+		&i.SubmittedAt,
+		&i.VotesConfirmed,
+	)
+	return i, err
 }
 
 const updateParticipantBeatURL = `-- name: UpdateParticipantBeatURL :one

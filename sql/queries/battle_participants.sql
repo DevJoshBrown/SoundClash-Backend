@@ -32,3 +32,23 @@ UPDATE battle_participants
 SET duration_seconds = $2
 WHERE id = $1
 RETURNING *;
+
+-- name: RemoveParticipant :exec
+DELETE FROM battle_participants
+WHERE battle_id = $1 AND user_id = $2;
+
+-- name: MarkFinishedEarly :exec
+UPDATE battle_participants
+SET finished_early = TRUE
+WHERE battle_id = $1 AND user_id = $2;
+
+-- name: AllFinishedEarly :one
+SELECT COUNT(*) = COUNT(*) FILTER (WHERE finished_early = TRUE)
+FROM battle_participants
+WHERE battle_id = $1;
+
+-- name: UnconfirmVotes :one
+UPDATE battle_participants
+SET votes_confirmed = false
+WHERE battle_id = $1 AND user_id = $2
+RETURNING *;
