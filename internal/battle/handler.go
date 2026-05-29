@@ -28,7 +28,6 @@ func NewHandler(queries *db.Queries, s *scheduler.Scheduler, hubs *hub.Manager) 
 func (h Handler) CreateBattle(w http.ResponseWriter, r *http.Request) {
 	var params db.CreateBattleParams
 
-	// Scan to UID
 	user, err := auth.GetUserFromRequest(r, h.queries)
 	if err != nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -140,14 +139,14 @@ func (h Handler) StartBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	battleStatus, err := h.queries.UpdateBattleStatus(r.Context(), db.UpdateBattleStatusParams{
-		ID:     btl_uid,
-		Status: "in_progress",
-	})
+	battleStatus, err := h.queries.StartBattle(r.Context(), btl_uid)
 	if err != nil {
 		http.Error(w, "failed to update battle status", http.StatusInternalServerError)
 		return
 	}
+
+	msg, _ := json.Marshal(map[string]string{"type": "stage_change", "status": "in_progress"})
+	h.hubs.Broadcast(btl_uid, msg)
 
 	h.scheduler.Run(context.Background(), btl_uid, time.Duration(b.DurationMinutes)*time.Minute)
 
@@ -249,4 +248,48 @@ func (h Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.hubs.ServeWS(w, r, btl_uid)
+}
+
+func (h Handler) CancelBattle(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	battle_id := chi.URLParam(r, "id")
+	var btl_uid pgtype.UUID
+	if err := btl_uid.Scan(battle_id); err != nil {
+		http.Error(w, "invalid battle id", http.StatusBadRequest)
+		return
+	}
+
+	b, err := h.queries.GetBattle(r.Context(), btl_uid)
+	if err != nil {
+		http.Error(w, "battle not found", http.StatusNotFound)
+	}
+
+	if user.ID != b.CreatorID {
+		http.Error(w, "only the creator can cancel this battle", http.StatusForbidden)
+		return
+	}
+
+	if b.Status != "waiting" {
+		http.Error(w, "can only cancel a battle that hasn't started", http.StatusBadRequest)
+		return
+	}
+
+	_, err = h.queries.UpdateBattleStatus(r.Context(), db.UpdateBattleStatusParams{
+		ID:     btl_uid,
+		Status: "cancelled",
+	})
+	if err != nil {
+		http.Error(w, "failed to cancel battle", http.StatusInternalServerError)
+		return
+	}
+
+	msg, _ := json.Marshal(map[string]string{"type": "stage_change", "statis": "cancelled"})
+	h.hubs.Broadcast(btl_uid, msg)
+
+	w.WriteHeader(http.StatusNoContent)
 }

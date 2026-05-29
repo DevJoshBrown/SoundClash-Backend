@@ -57,7 +57,7 @@ func (h Handler) CastVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	participant, err := h.queries.GetParticipant(r.Context(), db.GetParticipantParams{
+	_, err = h.queries.GetParticipant(r.Context(), db.GetParticipantParams{
 		BattleID: btl_uid,
 		UserID:   user.ID,
 	})
@@ -72,14 +72,13 @@ func (h Handler) CastVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if participant.UserID == user.ID {
-		http.Error(w, "self vote not allowed", http.StatusForbidden)
-		return
-	}
-
 	target, err := h.queries.GetParticipantByID(r.Context(), participant_uid)
 	if err != nil {
 		http.Error(w, "no participant matches ID", http.StatusBadRequest)
+		return
+	}
+	if target.UserID == user.ID {
+		http.Error(w, "self vote not allowed", http.StatusForbidden)
 		return
 	}
 	if target.BeatUrl.String == "" {
@@ -147,4 +146,30 @@ func (h Handler) ConfirmVotes(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(participant)
+}
+
+func (h Handler) UnconfirmVotes(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	battle_id := chi.URLParam(r, "id")
+	var btl_uid pgtype.UUID
+	if err := btl_uid.Scan(battle_id); err != nil {
+		http.Error(w, "invalid battle id", http.StatusBadRequest)
+		return
+	}
+
+	_, err = h.queries.UnconfirmVotes(r.Context(), db.UnconfirmVotesParams{
+		BattleID: btl_uid,
+		UserID:   user.ID,
+	})
+	if err != nil {
+		http.Error(w, "failed to unconfirm votes", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

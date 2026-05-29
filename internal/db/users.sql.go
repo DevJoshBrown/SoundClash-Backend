@@ -164,7 +164,8 @@ const upsertUserByClerkID = `-- name: UpsertUserByClerkID :one
 INSERT INTO users (username, display_name, clerk_id)
 VALUES ($1, $2, $3)
 ON CONFLICT (clerk_id) DO UPDATE
-SET clerk_id = EXCLUDED.clerk_id
+SET clerk_id = EXCLUDED.clerk_id,
+display_name = EXCLUDED.display_name
 RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
 `
 

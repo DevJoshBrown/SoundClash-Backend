@@ -17,6 +17,12 @@ SET status = $2
 WHERE id = $1
 RETURNING *;
 
+-- name: StartBattle :one
+UPDATE battles
+SET status = 'in_progress', started_at = NOW()
+WHERE id = $1
+RETURNING *;
+
 -- name: UpdateListeningIndex :one
 UPDATE battles
 SET current_listening_index = $2

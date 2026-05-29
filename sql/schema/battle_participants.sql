@@ -4,6 +4,7 @@ CREATE TABLE battle_participants (
     user_id UUID NOT NULL REFERENCES users(id),
     beat_url TEXT,
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    duration_seconds INTEGER,
     submitted_at TIMESTAMPTZ,
     votes_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
     UNIQUE (battle_id, user_id)
