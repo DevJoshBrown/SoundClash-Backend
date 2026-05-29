@@ -100,6 +100,12 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 		}
 
 		for i, participantID := range listeningOrder {
+			p, err := s.queries.GetParticipantByID(ctx, participantID)
+			if err != nil {
+				log.Printf("scheduler: failed to get participant for duration %v: %v", participantID, err)
+				return
+			}
+
 			_, err = s.queries.UpdateListeningIndex(ctx, db.UpdateListeningIndexParams{
 				ID:                    battleID,
 				CurrentListeningIndex: int32(i),
@@ -108,13 +114,18 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 				log.Printf("scheduler: failed to update listening index %v: %v", battleID, err)
 				return
 			}
-			s.broadcastListeningTrack(battleID)
 
-			p, err := s.queries.GetParticipantByID(ctx, participantID)
-			if err != nil {
-				log.Printf("scheduler: failed to get participant for duration %v: %v", participantID, err)
-				return
+			if !p.BeatUrl.Valid || p.BeatUrl.String == "" {
+				s.broadcastNoSubmission(battleID)
+				select {
+				case <-time.After(5 * time.Second):
+				case <-ctx.Done():
+					return
+				}
+				continue
 			}
+
+			s.broadcastListeningTrack(battleID)
 
 			trackDuration := 45 * time.Second
 			if p.DurationSeconds.Valid {
@@ -137,6 +148,20 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 			log.Printf("scheduler: failed to updated battle status to voting %v: %v", battleID, err)
 			return
 		}
+
+		// auto-confirm disqualified participants so they don't block the voting deadline
+		for _, p := range listeningOrder {
+			participant, err := s.queries.GetParticipantByID(ctx, p)
+			if err != nil {
+				continue
+			}
+			if !participant.BeatUrl.Valid || participant.BeatUrl.String == "" {
+				if _, err := s.queries.ConfirmVotes(ctx, participant.ID); err != nil {
+					log.Printf("scheduler: failed to auto-confirm DQ participant %v: %v", participant.ID, err)
+				}
+			}
+		}
+
 		log.Printf("scheduler: battle %v -> voting", battleID)
 		s.broadcastStage(battleID, "voting")
 
@@ -179,7 +204,11 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 		log.Printf("scheduler: battle %v -> results", battleID)
 		s.broadcastStage(battleID, "results")
 
-		os.RemoveAll(fmt.Sprintf("tmp/%s", battleID))
+		battleIDStr := fmt.Sprintf("%s", battleID)
+		s.hubs.SetOnEmpty(battleID, func() {
+			os.RemoveAll(fmt.Sprintf("uploads/%s", battleIDStr))
+			log.Printf("scheduler: cleaned up uploads for battle %s", battleIDStr)
+		})
 
 		battle, err := s.queries.GetBattle(ctx, battleID)
 		if err != nil {
@@ -315,6 +344,11 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 
 func (s *Scheduler) broadcastStage(battleID pgtype.UUID, status string) {
 	msg := fmt.Sprintf(`{"type":"stage_change","status":"%s"}`, status)
+	s.hubs.Broadcast(battleID, []byte(msg))
+}
+
+func (s *Scheduler) broadcastNoSubmission(battleID pgtype.UUID) {
+	msg := `{"type":"stage_change","status":"listening","no_submission":true}`
 	s.hubs.Broadcast(battleID, []byte(msg))
 }
 

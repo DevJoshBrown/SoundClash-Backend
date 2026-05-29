@@ -14,6 +14,7 @@ type Client struct {
 type Hub struct {
 	clients map[*Client]bool
 	mu      sync.Mutex
+	onEmpty func()
 }
 
 // creates a Hub instance
@@ -33,9 +34,14 @@ func (h *Hub) register(c *Client) {
 // removes a client from the hub
 func (h *Hub) unregister(c *Client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	delete(h.clients, c)
 	close(c.send)
+	empty := len(h.clients) == 0
+	onEmpty := h.onEmpty
+	h.mu.Unlock()
+	if empty && onEmpty != nil {
+		onEmpty()
+	}
 }
 
 // hub broadcast method
@@ -73,6 +79,13 @@ func (m *Manager) GetOrCreate(battleID pgtype.UUID) *Hub {
 }
 
 // sends a message to every client in the hub (defined by the battleID)
+func (m *Manager) SetOnEmpty(battleID pgtype.UUID, fn func()) {
+	h := m.GetOrCreate(battleID)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.onEmpty = fn
+}
+
 func (m *Manager) Broadcast(battleID pgtype.UUID, msg []byte) {
 	m.mu.Lock()
 	h, ok := m.hubs[battleID]

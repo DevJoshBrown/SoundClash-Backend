@@ -131,7 +131,7 @@ func (h Handler) SubmitParticipant(w http.ResponseWriter, r *http.Request) {
 		io.Copy(tmp, file)
 		tmp.Close()
 
-		outputDir := fmt.Sprintf("tmp/%s/%s", battle_id, valid_participant.ID)
+		outputDir := fmt.Sprintf("uploads/%s/%s", battle_id, valid_participant.ID)
 		outputPath, duration, err := audio.Transcode(tmp.Name(), outputDir)
 		if err != nil {
 			http.Error(w, "failed to transcode audio", http.StatusInternalServerError)

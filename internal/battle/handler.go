@@ -201,38 +201,51 @@ func (h Handler) GetResults(w http.ResponseWriter, r *http.Request) {
 		voteCounts[v.VotedForParticipantID]++
 	}
 
-	// build results slice
-	results := make([]ParticipantResult, 0, len(participants))
+	// build results — separate DQ'd (no submission) from ranked
+	var ranked []ParticipantResult
+	var disqualified []ParticipantResult
 	for _, p := range participants {
 		count := voteCounts[p.ID]
 		avg := 0.0
 		if count > 0 {
 			avg = float64(scoreSums[p.ID]) / float64(count)
 		}
-		results = append(results, ParticipantResult{
+		r := ParticipantResult{
 			Participant:  p,
 			AverageScore: avg,
 			VoteCount:    count,
-		})
+		}
+		if !p.BeatUrl.Valid || p.BeatUrl.String == "" {
+			disqualified = append(disqualified, r)
+		} else {
+			ranked = append(ranked, r)
+		}
 	}
 
-	// insertion sort by average score descending
-	for i := 1; i < len(results); i++ {
-		for j := i; j > 0 && results[j].AverageScore > results[j-1].AverageScore; j-- {
-			results[j], results[j-1] = results[j-1], results[j]
+	// insertion sort ranked by average score descending
+	for i := 1; i < len(ranked); i++ {
+		for j := i; j > 0 && ranked[j].AverageScore > ranked[j-1].AverageScore; j-- {
+			ranked[j], ranked[j-1] = ranked[j-1], ranked[j]
 		}
 	}
 
 	// assign positions — tied scores share the same position
-	for i := range results {
+	for i := range ranked {
 		if i == 0 {
-			results[i].Position = 1
-		} else if results[i].AverageScore == results[i-1].AverageScore {
-			results[i].Position = results[i-1].Position
+			ranked[i].Position = 1
+		} else if ranked[i].AverageScore == ranked[i-1].AverageScore {
+			ranked[i].Position = ranked[i-1].Position
 		} else {
-			results[i].Position = i + 1
+			ranked[i].Position = i + 1
 		}
 	}
+
+	// DQ'd participants get position 0 (frontend treats 0 as disqualified)
+	for i := range disqualified {
+		disqualified[i].Position = 0
+	}
+
+	results := append(ranked, disqualified...)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)

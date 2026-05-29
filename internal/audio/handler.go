@@ -40,6 +40,7 @@ func (h Handler) GetTranscodedAudio(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	http.ServeFile(w, r, participant.BeatUrl.String)
 
 }
