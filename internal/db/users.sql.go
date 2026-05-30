@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (username, display_name)
 VALUES ($1, $2)
-RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, profile_picture_url, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -33,6 +33,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.BattlesPlayed,
 		&i.BattlesWon,
 		&i.ClerkID,
+		&i.ProfilePictureUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -40,7 +41,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByClerkID = `-- name: GetUserByClerkID :one
-SELECT id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at FROM users
+SELECT id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, profile_picture_url, created_at, updated_at FROM users
 WHERE clerk_id = $1
 `
 
@@ -55,6 +56,7 @@ func (q *Queries) GetUserByClerkID(ctx context.Context, clerkID pgtype.Text) (Us
 		&i.BattlesPlayed,
 		&i.BattlesWon,
 		&i.ClerkID,
+		&i.ProfilePictureUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -62,7 +64,7 @@ func (q *Queries) GetUserByClerkID(ctx context.Context, clerkID pgtype.Text) (Us
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at FROM users
+SELECT id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, profile_picture_url, created_at, updated_at FROM users
 WHERE id = $1
 `
 
@@ -77,6 +79,30 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.BattlesPlayed,
 		&i.BattlesWon,
 		&i.ClerkID,
+		&i.ProfilePictureUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, profile_picture_url, created_at, updated_at FROM users
+WHERE username = $1
+`
+
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.EloRating,
+		&i.BattlesPlayed,
+		&i.BattlesWon,
+		&i.ClerkID,
+		&i.ProfilePictureUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -87,7 +113,7 @@ const incrementBattlesPlayed = `-- name: IncrementBattlesPlayed :one
 UPDATE users
 SET battles_played = battles_played + 1
 WHERE id = $1
-RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, profile_picture_url, created_at, updated_at
 `
 
 func (q *Queries) IncrementBattlesPlayed(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -101,6 +127,7 @@ func (q *Queries) IncrementBattlesPlayed(ctx context.Context, id pgtype.UUID) (U
 		&i.BattlesPlayed,
 		&i.BattlesWon,
 		&i.ClerkID,
+		&i.ProfilePictureUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -111,7 +138,7 @@ const incrementBattlesWon = `-- name: IncrementBattlesWon :one
 UPDATE users
 SET battles_won = battles_won + 1
 WHERE id = $1
-RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, profile_picture_url, created_at, updated_at
 `
 
 func (q *Queries) IncrementBattlesWon(ctx context.Context, id pgtype.UUID) (User, error) {
@@ -125,6 +152,7 @@ func (q *Queries) IncrementBattlesWon(ctx context.Context, id pgtype.UUID) (User
 		&i.BattlesPlayed,
 		&i.BattlesWon,
 		&i.ClerkID,
+		&i.ProfilePictureUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -135,7 +163,7 @@ const updateUserElo = `-- name: UpdateUserElo :one
 UPDATE users
 SET elo_rating = $2
 WHERE id = $1
-RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, profile_picture_url, created_at, updated_at
 `
 
 type UpdateUserEloParams struct {
@@ -154,6 +182,38 @@ func (q *Queries) UpdateUserElo(ctx context.Context, arg UpdateUserEloParams) (U
 		&i.BattlesPlayed,
 		&i.BattlesWon,
 		&i.ClerkID,
+		&i.ProfilePictureUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserProfile = `-- name: UpdateUserProfile :one
+UPDATE users
+SET username = $2, display_name = $3
+WHERE id = $1
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, profile_picture_url, created_at, updated_at
+`
+
+type UpdateUserProfileParams struct {
+	ID          pgtype.UUID `json:"id"`
+	Username    string      `json:"username"`
+	DisplayName string      `json:"display_name"`
+}
+
+func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserProfile, arg.ID, arg.Username, arg.DisplayName)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.EloRating,
+		&i.BattlesPlayed,
+		&i.BattlesWon,
+		&i.ClerkID,
+		&i.ProfilePictureUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -166,7 +226,7 @@ VALUES ($1, $2, $3)
 ON CONFLICT (clerk_id) DO UPDATE
 SET clerk_id = EXCLUDED.clerk_id,
 display_name = EXCLUDED.display_name
-RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, created_at, updated_at
+RETURNING id, username, display_name, elo_rating, battles_played, battles_won, clerk_id, profile_picture_url, created_at, updated_at
 `
 
 type UpsertUserByClerkIDParams struct {
@@ -186,6 +246,7 @@ func (q *Queries) UpsertUserByClerkID(ctx context.Context, arg UpsertUserByClerk
 		&i.BattlesPlayed,
 		&i.BattlesWon,
 		&i.ClerkID,
+		&i.ProfilePictureUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

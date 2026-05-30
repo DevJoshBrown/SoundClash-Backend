@@ -29,6 +29,16 @@ RETURNING *;
 SELECT * FROM users
 WHERE clerk_id = $1;
 
+-- name: UpdateUserProfile :one
+UPDATE users
+SET username = $2, display_name = $3
+WHERE id = $1
+RETURNING *;
+
+-- name: GetUserByUsername :one
+SELECT * FROM users
+WHERE username = $1;
+
 -- name: UpsertUserByClerkID :one
 INSERT INTO users (username, display_name, clerk_id)
 VALUES ($1, $2, $3)

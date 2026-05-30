@@ -56,6 +56,25 @@ func (h Handler) CreateBattle(w http.ResponseWriter, r *http.Request) {
 		log.Printf("CreateBattle: failed to auto-join creator: %v", err)
 	}
 
+	h.hubs.SetOnEmpty(b.ID, func() {
+		time.AfterFunc(5*time.Second, func() {
+			ctx := context.Background()
+			battle, err := h.queries.GetBattle(ctx, b.ID)
+			if err != nil || battle.Status != "waiting" {
+				return
+			}
+			_, err = h.queries.UpdateBattleStatus(ctx, db.UpdateBattleStatusParams{
+				ID:     b.ID,
+				Status: "cancelled",
+			})
+			if err != nil {
+				log.Printf("auto-cancel: failed to cancel battle %s: %v", b.ID, err)
+				return
+			}
+			log.Printf("auto-cancelled empty waiting battle %s", b.ID)
+		})
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(b)
@@ -156,10 +175,10 @@ func (h Handler) StartBattle(w http.ResponseWriter, r *http.Request) {
 }
 
 type ParticipantResult struct {
-	Participant  db.BattleParticipant `json:"participant"`
-	AverageScore float64              `json:"average_score"`
-	Position     int                  `json:"position"`
-	VoteCount    int                  `json:"vote_count"`
+	Participant  db.ListParticipantsRow `json:"participant"`
+	AverageScore float64                `json:"average_score"`
+	Position     int                    `json:"position"`
+	VoteCount    int                    `json:"vote_count"`
 }
 
 func (h Handler) GetResults(w http.ResponseWriter, r *http.Request) {
@@ -301,7 +320,10 @@ func (h Handler) CancelBattle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, _ := json.Marshal(map[string]string{"type": "stage_change", "statis": "cancelled"})
+	msg, err := json.Marshal(map[string]string{"type": "stage_change", "status": "cancelled"})
+	if err != nil {
+		log.Printf("CancelBattle: failed to marshal broadcast")
+	}
 	h.hubs.Broadcast(btl_uid, msg)
 
 	w.WriteHeader(http.StatusNoContent)

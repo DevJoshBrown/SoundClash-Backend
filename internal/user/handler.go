@@ -2,12 +2,15 @@ package user
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
+	"github.com/DevJoshBrown/BeatBattler/internal/auth"
 	"github.com/DevJoshBrown/BeatBattler/internal/db"
 	"github.com/DevJoshBrown/BeatBattler/internal/middleware"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -91,5 +94,54 @@ func (h Handler) SyncUser(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(user)
+}
 
+func (h Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var body struct {
+		Username    string `json:"username"`
+		DisplayName string `json:"display_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if body.Username == "" {
+		http.Error(w, "username is required", http.StatusBadRequest)
+		return
+	}
+	if body.DisplayName == "" {
+		body.DisplayName = body.Username
+	}
+
+	// check username is not taken by someone else
+	existing, err := h.queries.GetUserByUsername(r.Context(), body.Username)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "failed to check username", http.StatusInternalServerError)
+		return
+	}
+	if err == nil && existing.ID != user.ID {
+		http.Error(w, "username already taken", http.StatusConflict)
+		return
+	}
+
+	updated, err := h.queries.UpdateUserProfile(r.Context(), db.UpdateUserProfileParams{
+		ID:          user.ID,
+		Username:    body.Username,
+		DisplayName: body.DisplayName,
+	})
+	if err != nil {
+		log.Printf("UpdateProfile error: %v", err)
+		http.Error(w, "failed to update profile", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(updated)
 }

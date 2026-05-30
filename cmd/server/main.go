@@ -62,7 +62,7 @@ func main() {
 
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"http://localhost:5173"},
-		AllowedMethods: []string{"GET", "POST", "DELETE", "OPTIONS"},
+		AllowedMethods: []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Content-Type", "Authorization", "X-User-ID"},
 	}))
 
@@ -85,6 +85,7 @@ func main() {
 		r.Post("/users", userHandler.CreateUser)
 		r.Post("/users/sync", userHandler.SyncUser)
 		r.Get("/users/{id}", userHandler.GetUser)
+		r.Patch("/users/me", userHandler.UpdateProfile)
 		// battles
 		r.Post("/battles", battleHandler.CreateBattle)
 		r.Get("/battles", battleHandler.ListBattles)

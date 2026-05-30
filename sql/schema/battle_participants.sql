@@ -7,5 +7,7 @@ CREATE TABLE battle_participants (
     duration_seconds INTEGER,
     submitted_at TIMESTAMPTZ,
     votes_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+    finished_early BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (battle_id, user_id)
 );

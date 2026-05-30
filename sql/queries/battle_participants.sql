@@ -8,8 +8,27 @@ SELECT * FROM battle_participants
 WHERE battle_id = $1 AND user_id = $2;
 
 -- name: ListParticipants :many
-SELECT * FROM battle_participants
-WHERE battle_id = $1 ORDER BY joined_at;
+SELECT
+    bp.id,
+    bp.battle_id,
+    bp.user_id,
+    bp.beat_url,
+    bp.submitted_at,
+    bp.votes_confirmed,
+    bp.duration_seconds,
+    bp.finished_early,
+    bp.created_at AS created_at,
+    u.display_name,
+    u.username,
+    u.elo_rating,
+    u.battles_played,
+    u.battles_won,
+    u.profile_picture_url
+FROM battle_participants bp
+JOIN users u ON bp.user_id = u.id
+WHERE bp.battle_id = $1
+ORDER BY bp.created_at ASC;
+
 
 -- name: UpdateParticipantBeatURL :one
 UPDATE battle_participants

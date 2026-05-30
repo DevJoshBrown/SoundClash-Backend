@@ -1,6 +1,7 @@
 CREATE TABLE battles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     creator_id UUID REFERENCES users(id),
+    name TEXT,
     mode TEXT NOT NULL CHECK (mode IN ('sample_pack','ffa')),
     genre TEXT,
     sample_pack_id UUID,

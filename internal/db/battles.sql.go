@@ -12,15 +12,16 @@ import (
 )
 
 const createBattle = `-- name: CreateBattle :one
-INSERT INTO battles (creator_id, mode, genre, sample_pack_id, duration_minutes, max_participants)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
+INSERT INTO battles (creator_id, mode, genre, name, sample_pack_id, duration_minutes, max_participants)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, creator_id, name, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
 `
 
 type CreateBattleParams struct {
 	CreatorID       pgtype.UUID `json:"creator_id"`
 	Mode            string      `json:"mode"`
 	Genre           pgtype.Text `json:"genre"`
+	Name            pgtype.Text `json:"name"`
 	SamplePackID    pgtype.UUID `json:"sample_pack_id"`
 	DurationMinutes int32       `json:"duration_minutes"`
 	MaxParticipants int32       `json:"max_participants"`
@@ -31,6 +32,7 @@ func (q *Queries) CreateBattle(ctx context.Context, arg CreateBattleParams) (Bat
 		arg.CreatorID,
 		arg.Mode,
 		arg.Genre,
+		arg.Name,
 		arg.SamplePackID,
 		arg.DurationMinutes,
 		arg.MaxParticipants,
@@ -39,6 +41,7 @@ func (q *Queries) CreateBattle(ctx context.Context, arg CreateBattleParams) (Bat
 	err := row.Scan(
 		&i.ID,
 		&i.CreatorID,
+		&i.Name,
 		&i.Mode,
 		&i.Genre,
 		&i.SamplePackID,
@@ -55,7 +58,7 @@ func (q *Queries) CreateBattle(ctx context.Context, arg CreateBattleParams) (Bat
 }
 
 const getBattle = `-- name: GetBattle :one
-SELECT id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at FROM battles
+SELECT id, creator_id, name, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at FROM battles
 WHERE id = $1
 `
 
@@ -65,6 +68,7 @@ func (q *Queries) GetBattle(ctx context.Context, id pgtype.UUID) (Battle, error)
 	err := row.Scan(
 		&i.ID,
 		&i.CreatorID,
+		&i.Name,
 		&i.Mode,
 		&i.Genre,
 		&i.SamplePackID,
@@ -81,7 +85,8 @@ func (q *Queries) GetBattle(ctx context.Context, id pgtype.UUID) (Battle, error)
 }
 
 const listBattles = `-- name: ListBattles :many
-SELECT id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at FROM battles
+SELECT id, creator_id, name, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at FROM battles
+WHERE status = 'waiting'
 ORDER BY created_at DESC
 `
 
@@ -97,6 +102,7 @@ func (q *Queries) ListBattles(ctx context.Context) ([]Battle, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.CreatorID,
+			&i.Name,
 			&i.Mode,
 			&i.Genre,
 			&i.SamplePackID,
@@ -123,7 +129,7 @@ const startBattle = `-- name: StartBattle :one
 UPDATE battles
 SET status = 'in_progress', started_at = NOW()
 WHERE id = $1
-RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
+RETURNING id, creator_id, name, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
 `
 
 func (q *Queries) StartBattle(ctx context.Context, id pgtype.UUID) (Battle, error) {
@@ -132,6 +138,7 @@ func (q *Queries) StartBattle(ctx context.Context, id pgtype.UUID) (Battle, erro
 	err := row.Scan(
 		&i.ID,
 		&i.CreatorID,
+		&i.Name,
 		&i.Mode,
 		&i.Genre,
 		&i.SamplePackID,
@@ -151,7 +158,7 @@ const updateBattleStatus = `-- name: UpdateBattleStatus :one
 UPDATE battles
 SET status = $2
 WHERE id = $1
-RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
+RETURNING id, creator_id, name, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
 `
 
 type UpdateBattleStatusParams struct {
@@ -165,6 +172,7 @@ func (q *Queries) UpdateBattleStatus(ctx context.Context, arg UpdateBattleStatus
 	err := row.Scan(
 		&i.ID,
 		&i.CreatorID,
+		&i.Name,
 		&i.Mode,
 		&i.Genre,
 		&i.SamplePackID,
@@ -184,7 +192,7 @@ const updateListeningIndex = `-- name: UpdateListeningIndex :one
 UPDATE battles
 SET current_listening_index = $2
 WHERE id = $1
-RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
+RETURNING id, creator_id, name, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
 `
 
 type UpdateListeningIndexParams struct {
@@ -198,6 +206,7 @@ func (q *Queries) UpdateListeningIndex(ctx context.Context, arg UpdateListeningI
 	err := row.Scan(
 		&i.ID,
 		&i.CreatorID,
+		&i.Name,
 		&i.Mode,
 		&i.Genre,
 		&i.SamplePackID,
@@ -217,7 +226,7 @@ const updateListeningOrder = `-- name: UpdateListeningOrder :one
 UPDATE battles
 SET listening_order = $2
 WHERE id = $1
-RETURNING id, creator_id, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
+RETURNING id, creator_id, name, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at
 `
 
 type UpdateListeningOrderParams struct {
@@ -231,6 +240,7 @@ func (q *Queries) UpdateListeningOrder(ctx context.Context, arg UpdateListeningO
 	err := row.Scan(
 		&i.ID,
 		&i.CreatorID,
+		&i.Name,
 		&i.Mode,
 		&i.Genre,
 		&i.SamplePackID,

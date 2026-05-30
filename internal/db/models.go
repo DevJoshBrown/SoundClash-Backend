@@ -11,6 +11,7 @@ import (
 type Battle struct {
 	ID                    pgtype.UUID        `json:"id"`
 	CreatorID             pgtype.UUID        `json:"creator_id"`
+	Name                  pgtype.Text        `json:"name"`
 	Mode                  string             `json:"mode"`
 	Genre                 pgtype.Text        `json:"genre"`
 	SamplePackID          pgtype.UUID        `json:"sample_pack_id"`
@@ -33,6 +34,8 @@ type BattleParticipant struct {
 	DurationSeconds pgtype.Int4        `json:"duration_seconds"`
 	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
 	VotesConfirmed  bool               `json:"votes_confirmed"`
+	FinishedEarly   bool               `json:"finished_early"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
 type BattleQueue struct {
@@ -43,15 +46,16 @@ type BattleQueue struct {
 }
 
 type User struct {
-	ID            pgtype.UUID        `json:"id"`
-	Username      string             `json:"username"`
-	DisplayName   string             `json:"display_name"`
-	EloRating     int32              `json:"elo_rating"`
-	BattlesPlayed int32              `json:"battles_played"`
-	BattlesWon    int32              `json:"battles_won"`
-	ClerkID       pgtype.Text        `json:"clerk_id"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	ID                pgtype.UUID        `json:"id"`
+	Username          string             `json:"username"`
+	DisplayName       string             `json:"display_name"`
+	EloRating         int32              `json:"elo_rating"`
+	BattlesPlayed     int32              `json:"battles_played"`
+	BattlesWon        int32              `json:"battles_won"`
+	ClerkID           pgtype.Text        `json:"clerk_id"`
+	ProfilePictureUrl pgtype.Text        `json:"profile_picture_url"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Vote struct {

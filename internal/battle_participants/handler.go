@@ -193,7 +193,7 @@ func (h Handler) ListParticipants(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(participants) == 0 {
-		participants = []db.BattleParticipant{}
+		participants = []db.ListParticipantsRow{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
