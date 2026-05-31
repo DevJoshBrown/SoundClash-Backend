@@ -276,40 +276,52 @@ func (h Handler) FinishEarly(w http.ResponseWriter, r *http.Request) {
 	}
 
 	allDone, err := h.queries.AllFinishedEarly(r.Context(), btl_uid)
-	count, _ := h.queries.CountActiveParticipants(r.Context(), btl_uid)
-
-	if err == nil && allDone && count == 1 {
-		eloGain := 0
-		if !b.CreatorID.Valid {
-			eloGain = 15
-			participants, err := h.queries.ListParticipants(r.Context(), btl_uid)
-			if err == nil {
-				for _, p := range participants {
-					if p.ParticipantStatus == "active" || p.ParticipantStatus == "finished" {
-						h.queries.UpdateUserElo(r.Context(), db.UpdateUserEloParams{
-							ID:        p.UserID,
-							EloRating: p.EloRating + 15,
-						})
-						break
-					}
-				}
-			}
-		}
-		h.queries.UpdateBattleStatus(r.Context(), db.UpdateBattleStatusParams{
-			ID:     btl_uid,
-			Status: "cancelled",
-		})
-		msg, _ := json.Marshal(map[string]interface{}{"type": "walkover", "elo_gain": eloGain})
-		h.hubs.Broadcast(btl_uid, msg)
-		w.WriteHeader(http.StatusNoContent)
-		return
-	}
-
 	if err == nil && allDone {
+		if h.concludeIfWalkover(r.Context(), btl_uid, b) {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		h.scheduler.SkipInProgress(btl_uid)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// concludeIfWalkover ends the battle as a walkover when only one contender
+// remains (everyone else absent/disqualified). It awards the lone survivor,
+// cancels the battle, and broadcasts a "walkover" message. ELO is only granted
+// for ranked battles (creator_id NULL); custom battles award nothing.
+// Returns true if a walkover was concluded.
+func (h Handler) concludeIfWalkover(ctx context.Context, battleID pgtype.UUID, b db.Battle) bool {
+	count, err := h.queries.CountActiveParticipants(ctx, battleID)
+	if err != nil || count != 1 {
+		return false
+	}
+
+	eloGain := 0
+	if !b.CreatorID.Valid {
+		eloGain = 15
+		participants, err := h.queries.ListParticipants(ctx, battleID)
+		if err == nil {
+			for _, p := range participants {
+				if p.ParticipantStatus == "active" || p.ParticipantStatus == "finished" {
+					h.queries.UpdateUserElo(ctx, db.UpdateUserEloParams{
+						ID:        p.UserID,
+						EloRating: p.EloRating + int32(eloGain),
+					})
+					break
+				}
+			}
+		}
+	}
+
+	h.queries.UpdateBattleStatus(ctx, db.UpdateBattleStatusParams{
+		ID:     battleID,
+		Status: "cancelled",
+	})
+	msg, _ := json.Marshal(map[string]interface{}{"type": "walkover", "elo_gain": eloGain})
+	h.hubs.Broadcast(battleID, msg)
+	return true
 }
 
 func (h Handler) Forfeit(w http.ResponseWriter, r *http.Request) {
@@ -346,36 +358,16 @@ func (h Handler) Forfeit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A forfeit is permanent, so the lone survivor wins immediately — no need to
+	// wait for them to finish (unlike absent, where we give time to reconnect).
+	if h.concludeIfWalkover(r.Context(), btl_uid, b) {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	allDone, err := h.queries.AllFinishedEarly(r.Context(), btl_uid)
 	if err == nil && allDone {
 		h.scheduler.SkipInProgress(btl_uid)
-	}
-
-	count, err := h.queries.CountActiveParticipants(r.Context(), btl_uid)
-	if err == nil && count == 1 {
-		if !b.CreatorID.Valid {
-			participants, err := h.queries.ListParticipants(r.Context(), btl_uid)
-			if err == nil {
-				for _, p := range participants {
-					if p.ParticipantStatus == "active" || p.ParticipantStatus == "finished" {
-						h.queries.UpdateUserElo(r.Context(), db.UpdateUserEloParams{
-							ID:        p.UserID,
-							EloRating: p.EloRating + 15,
-						})
-						break
-					}
-				}
-			}
-		}
-		h.queries.UpdateBattleStatus(r.Context(), db.UpdateBattleStatusParams{
-			ID:     btl_uid,
-			Status: "cancelled",
-		})
-		msg, _ := json.Marshal(map[string]interface{}{"type": "walkover", "elo_gain": 15})
-		h.hubs.Broadcast(btl_uid, msg)
-		w.WriteHeader(http.StatusNoContent)
-		return
-
 	}
 
 	msg, _ := json.Marshal(map[string]string{"type": "participant_update"})
@@ -453,48 +445,23 @@ func (h Handler) Absent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.AfterFunc(10*time.Second, func() {
-		ctx := context.Background()
-		h.queries.SetParticipantAbsent(ctx, db.SetParticipantAbsentParams{
-			BattleID: btl_uid,
-			UserID:   user.ID,
-		})
+	//time.AfterFunc(10*time.Second, func() {
+	ctx := context.Background()
+	h.queries.SetParticipantAbsent(ctx, db.SetParticipantAbsentParams{
+		BattleID: btl_uid,
+		UserID:   user.ID,
+	})
 
-		allDone, err := h.queries.AllFinishedEarly(ctx, btl_uid)
-		count, _ := h.queries.CountActiveParticipants(ctx, btl_uid)
-
-		if err == nil && allDone && count == 1 {
-			eloGain := 0
-			if !b.CreatorID.Valid {
-				eloGain = 15
-				participants, err := h.queries.ListParticipants(ctx, btl_uid)
-				if err == nil {
-					for _, p := range participants {
-						if p.ParticipantStatus == "active" || p.ParticipantStatus == "finished" {
-							h.queries.UpdateUserElo(ctx, db.UpdateUserEloParams{
-								ID:        p.UserID,
-								EloRating: p.EloRating + 15,
-							})
-							break
-						}
-					}
-				}
-			}
-			h.queries.UpdateBattleStatus(ctx, db.UpdateBattleStatusParams{
-				ID:     btl_uid,
-				Status: "cancelled",
-			})
-			msg, _ := json.Marshal(map[string]interface{}{"type": "walkover", "elo_gain": eloGain})
-			h.hubs.Broadcast(btl_uid, msg)
+	allDone, err := h.queries.AllFinishedEarly(ctx, btl_uid)
+	if err == nil && allDone {
+		if h.concludeIfWalkover(ctx, btl_uid, b) {
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		h.scheduler.SkipInProgress(btl_uid)
+	}
 
-		if err == nil && allDone {
-			h.scheduler.SkipInProgress(btl_uid)
-		}
-
-		msg, _ := json.Marshal(map[string]string{"type": "participant_update"})
-		h.hubs.Broadcast(btl_uid, msg)
-	})
+	msg, _ := json.Marshal(map[string]string{"type": "participant_update"})
+	h.hubs.Broadcast(btl_uid, msg)
 	w.WriteHeader(http.StatusNoContent)
 }
