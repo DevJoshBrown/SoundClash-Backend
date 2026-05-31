@@ -145,3 +145,20 @@ func (h Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(updated)
 }
+
+func (h Handler) GetActiveBattle(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	result, err := h.queries.GetActiveParticipantForUser(r.Context(), user.ID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}

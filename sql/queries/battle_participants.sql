@@ -92,3 +92,12 @@ RETURNING *;
 SELECT COUNT(*) FROM battle_participants
 WHERE battle_id = $1
 AND participant_status NOT IN ('disqualified', 'absent');
+
+-- name: GetActiveParticipantForUser :one
+SELECT bp.battle_id, bp.participant_status
+FROM battle_participants bp
+JOIN battles b ON bp.battle_id = b.id
+WHERE bp.user_id = $1
+AND b.status = 'in_progress'
+AND bp.participant_status IN ('active','absent','finished')
+LIMIT 1;

@@ -92,6 +92,28 @@ func (q *Queries) CreateParticipant(ctx context.Context, arg CreateParticipantPa
 	return i, err
 }
 
+const getActiveParticipantForUser = `-- name: GetActiveParticipantForUser :one
+SELECT bp.battle_id, bp.participant_status
+FROM battle_participants bp
+JOIN battles b ON bp.battle_id = b.id
+WHERE bp.user_id = $1
+AND b.status = 'in_progress'
+AND bp.participant_status IN ('active','absent','finished')
+LIMIT 1
+`
+
+type GetActiveParticipantForUserRow struct {
+	BattleID          pgtype.UUID `json:"battle_id"`
+	ParticipantStatus string      `json:"participant_status"`
+}
+
+func (q *Queries) GetActiveParticipantForUser(ctx context.Context, userID pgtype.UUID) (GetActiveParticipantForUserRow, error) {
+	row := q.db.QueryRow(ctx, getActiveParticipantForUser, userID)
+	var i GetActiveParticipantForUserRow
+	err := row.Scan(&i.BattleID, &i.ParticipantStatus)
+	return i, err
+}
+
 const getParticipant = `-- name: GetParticipant :one
 SELECT id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, participant_status, created_at FROM battle_participants
 WHERE battle_id = $1 AND user_id = $2

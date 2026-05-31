@@ -86,6 +86,7 @@ func main() {
 		r.Post("/users/sync", userHandler.SyncUser)
 		r.Get("/users/{id}", userHandler.GetUser)
 		r.Patch("/users/me", userHandler.UpdateProfile)
+		r.Get("/users/me/active-battle", userHandler.GetActiveBattle)
 		// battles
 		r.Post("/battles", battleHandler.CreateBattle)
 		r.Get("/battles", battleHandler.ListBattles)
