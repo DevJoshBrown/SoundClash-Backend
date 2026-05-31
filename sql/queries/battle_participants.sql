@@ -16,7 +16,7 @@ SELECT
     bp.submitted_at,
     bp.votes_confirmed,
     bp.duration_seconds,
-    bp.finished_early,
+    bp.participant_status,
     bp.created_at AS created_at,
     u.display_name,
     u.username,
@@ -58,16 +58,37 @@ WHERE battle_id = $1 AND user_id = $2;
 
 -- name: MarkFinishedEarly :exec
 UPDATE battle_participants
-SET finished_early = TRUE
+SET participant_status = 'finished'
 WHERE battle_id = $1 AND user_id = $2;
 
 -- name: AllFinishedEarly :one
-SELECT COUNT(*) = COUNT(*) FILTER (WHERE finished_early = TRUE)
-FROM battle_participants
-WHERE battle_id = $1;
+SELECT NOT EXISTS (
+    SELECT 1 FROM battle_participants
+    WHERE battle_id = $1
+    AND participant_status = 'active');
+
+-- name: SetParticipantAbsent :exec
+UPDATE battle_participants
+SET participant_status = 'absent'
+WHERE battle_id = $1 AND user_id = $2;
+
+-- name: SetParticipantActive :exec
+UPDATE battle_participants
+SET participant_status = 'active'
+WHERE battle_id = $1 AND user_id = $2;
+
+-- name: SetParticipantDisqualified :exec
+UPDATE battle_participants
+SET participant_status = 'disqualified'
+WHERE battle_id = $1 AND user_id = $2;
 
 -- name: UnconfirmVotes :one
 UPDATE battle_participants
 SET votes_confirmed = false
 WHERE battle_id = $1 AND user_id = $2
 RETURNING *;
+
+-- name: CountActiveParticipants :one
+SELECT COUNT(*) FROM battle_participants
+WHERE battle_id = $1
+AND participant_status NOT IN ('disqualified', 'absent');

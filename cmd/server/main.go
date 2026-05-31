@@ -103,11 +103,14 @@ func main() {
 		r.Get("/battles/{id}/participants", participantHandler.ListParticipants)
 		r.Delete("/battles/{id}/leave", participantHandler.LeaveParticipant)
 		r.Post("/battles/{id}/finish-early", participantHandler.FinishEarly)
+		r.Post("/battles/{id}/forfeit", participantHandler.Forfeit)
+		r.Post("/battles/{id}/rejoin", participantHandler.Rejoin)
+		r.Post("/battles/{id}/absent", participantHandler.Absent)
+
 		// votes
 		r.Post("/battles/{id}/vote", voteHandler.CastVote)
 		r.Post("/battles/{id}/confirm-votes", voteHandler.ConfirmVotes)
 		r.Post("/battles/{id}/unconfirm-votes", voteHandler.UnconfirmVotes)
-
 	})
 
 	// Start server

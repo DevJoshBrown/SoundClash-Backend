@@ -12,23 +12,24 @@ import (
 )
 
 const allFinishedEarly = `-- name: AllFinishedEarly :one
-SELECT COUNT(*) = COUNT(*) FILTER (WHERE finished_early = TRUE)
-FROM battle_participants
-WHERE battle_id = $1
+SELECT NOT EXISTS (
+    SELECT 1 FROM battle_participants
+    WHERE battle_id = $1
+    AND participant_status = 'active')
 `
 
 func (q *Queries) AllFinishedEarly(ctx context.Context, battleID pgtype.UUID) (bool, error) {
 	row := q.db.QueryRow(ctx, allFinishedEarly, battleID)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
+	var not_exists bool
+	err := row.Scan(&not_exists)
+	return not_exists, err
 }
 
 const confirmVotes = `-- name: ConfirmVotes :one
 UPDATE battle_participants
 SET votes_confirmed = TRUE
 WHERE id = $1
-RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, finished_early, created_at
+RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, participant_status, created_at
 `
 
 func (q *Queries) ConfirmVotes(ctx context.Context, id pgtype.UUID) (BattleParticipant, error) {
@@ -43,16 +44,29 @@ func (q *Queries) ConfirmVotes(ctx context.Context, id pgtype.UUID) (BattleParti
 		&i.DurationSeconds,
 		&i.SubmittedAt,
 		&i.VotesConfirmed,
-		&i.FinishedEarly,
+		&i.ParticipantStatus,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
+const countActiveParticipants = `-- name: CountActiveParticipants :one
+SELECT COUNT(*) FROM battle_participants
+WHERE battle_id = $1
+AND participant_status NOT IN ('disqualified', 'absent')
+`
+
+func (q *Queries) CountActiveParticipants(ctx context.Context, battleID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveParticipants, battleID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createParticipant = `-- name: CreateParticipant :one
 INSERT INTO battle_participants (battle_id, user_id)
 VALUES ($1, $2)
-RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, finished_early, created_at
+RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, participant_status, created_at
 `
 
 type CreateParticipantParams struct {
@@ -72,14 +86,14 @@ func (q *Queries) CreateParticipant(ctx context.Context, arg CreateParticipantPa
 		&i.DurationSeconds,
 		&i.SubmittedAt,
 		&i.VotesConfirmed,
-		&i.FinishedEarly,
+		&i.ParticipantStatus,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getParticipant = `-- name: GetParticipant :one
-SELECT id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, finished_early, created_at FROM battle_participants
+SELECT id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, participant_status, created_at FROM battle_participants
 WHERE battle_id = $1 AND user_id = $2
 `
 
@@ -100,14 +114,14 @@ func (q *Queries) GetParticipant(ctx context.Context, arg GetParticipantParams) 
 		&i.DurationSeconds,
 		&i.SubmittedAt,
 		&i.VotesConfirmed,
-		&i.FinishedEarly,
+		&i.ParticipantStatus,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getParticipantByID = `-- name: GetParticipantByID :one
-SELECT id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, finished_early, created_at FROM battle_participants
+SELECT id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, participant_status, created_at FROM battle_participants
 WHERE id = $1
 `
 
@@ -123,7 +137,7 @@ func (q *Queries) GetParticipantByID(ctx context.Context, id pgtype.UUID) (Battl
 		&i.DurationSeconds,
 		&i.SubmittedAt,
 		&i.VotesConfirmed,
-		&i.FinishedEarly,
+		&i.ParticipantStatus,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -138,7 +152,7 @@ SELECT
     bp.submitted_at,
     bp.votes_confirmed,
     bp.duration_seconds,
-    bp.finished_early,
+    bp.participant_status,
     bp.created_at AS created_at,
     u.display_name,
     u.username,
@@ -160,7 +174,7 @@ type ListParticipantsRow struct {
 	SubmittedAt       pgtype.Timestamptz `json:"submitted_at"`
 	VotesConfirmed    bool               `json:"votes_confirmed"`
 	DurationSeconds   pgtype.Int4        `json:"duration_seconds"`
-	FinishedEarly     bool               `json:"finished_early"`
+	ParticipantStatus string             `json:"participant_status"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	DisplayName       string             `json:"display_name"`
 	Username          string             `json:"username"`
@@ -187,7 +201,7 @@ func (q *Queries) ListParticipants(ctx context.Context, battleID pgtype.UUID) ([
 			&i.SubmittedAt,
 			&i.VotesConfirmed,
 			&i.DurationSeconds,
-			&i.FinishedEarly,
+			&i.ParticipantStatus,
 			&i.CreatedAt,
 			&i.DisplayName,
 			&i.Username,
@@ -208,7 +222,7 @@ func (q *Queries) ListParticipants(ctx context.Context, battleID pgtype.UUID) ([
 
 const markFinishedEarly = `-- name: MarkFinishedEarly :exec
 UPDATE battle_participants
-SET finished_early = TRUE
+SET participant_status = 'finished'
 WHERE battle_id = $1 AND user_id = $2
 `
 
@@ -237,11 +251,59 @@ func (q *Queries) RemoveParticipant(ctx context.Context, arg RemoveParticipantPa
 	return err
 }
 
+const setParticipantAbsent = `-- name: SetParticipantAbsent :exec
+UPDATE battle_participants
+SET participant_status = 'absent'
+WHERE battle_id = $1 AND user_id = $2
+`
+
+type SetParticipantAbsentParams struct {
+	BattleID pgtype.UUID `json:"battle_id"`
+	UserID   pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) SetParticipantAbsent(ctx context.Context, arg SetParticipantAbsentParams) error {
+	_, err := q.db.Exec(ctx, setParticipantAbsent, arg.BattleID, arg.UserID)
+	return err
+}
+
+const setParticipantActive = `-- name: SetParticipantActive :exec
+UPDATE battle_participants
+SET participant_status = 'active'
+WHERE battle_id = $1 AND user_id = $2
+`
+
+type SetParticipantActiveParams struct {
+	BattleID pgtype.UUID `json:"battle_id"`
+	UserID   pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) SetParticipantActive(ctx context.Context, arg SetParticipantActiveParams) error {
+	_, err := q.db.Exec(ctx, setParticipantActive, arg.BattleID, arg.UserID)
+	return err
+}
+
+const setParticipantDisqualified = `-- name: SetParticipantDisqualified :exec
+UPDATE battle_participants
+SET participant_status = 'disqualified'
+WHERE battle_id = $1 AND user_id = $2
+`
+
+type SetParticipantDisqualifiedParams struct {
+	BattleID pgtype.UUID `json:"battle_id"`
+	UserID   pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) SetParticipantDisqualified(ctx context.Context, arg SetParticipantDisqualifiedParams) error {
+	_, err := q.db.Exec(ctx, setParticipantDisqualified, arg.BattleID, arg.UserID)
+	return err
+}
+
 const unconfirmVotes = `-- name: UnconfirmVotes :one
 UPDATE battle_participants
 SET votes_confirmed = false
 WHERE battle_id = $1 AND user_id = $2
-RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, finished_early, created_at
+RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, participant_status, created_at
 `
 
 type UnconfirmVotesParams struct {
@@ -261,7 +323,7 @@ func (q *Queries) UnconfirmVotes(ctx context.Context, arg UnconfirmVotesParams) 
 		&i.DurationSeconds,
 		&i.SubmittedAt,
 		&i.VotesConfirmed,
-		&i.FinishedEarly,
+		&i.ParticipantStatus,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -271,7 +333,7 @@ const updateParticipantBeatURL = `-- name: UpdateParticipantBeatURL :one
 UPDATE battle_participants
 SET beat_url = $2, submitted_at = $3
 WHERE id = $1
-RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, finished_early, created_at
+RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, participant_status, created_at
 `
 
 type UpdateParticipantBeatURLParams struct {
@@ -292,7 +354,7 @@ func (q *Queries) UpdateParticipantBeatURL(ctx context.Context, arg UpdatePartic
 		&i.DurationSeconds,
 		&i.SubmittedAt,
 		&i.VotesConfirmed,
-		&i.FinishedEarly,
+		&i.ParticipantStatus,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -302,7 +364,7 @@ const updateParticipantDuration = `-- name: UpdateParticipantDuration :one
 UPDATE battle_participants
 SET duration_seconds = $2
 WHERE id = $1
-RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, finished_early, created_at
+RETURNING id, battle_id, user_id, beat_url, joined_at, duration_seconds, submitted_at, votes_confirmed, participant_status, created_at
 `
 
 type UpdateParticipantDurationParams struct {
@@ -322,7 +384,7 @@ func (q *Queries) UpdateParticipantDuration(ctx context.Context, arg UpdateParti
 		&i.DurationSeconds,
 		&i.SubmittedAt,
 		&i.VotesConfirmed,
-		&i.FinishedEarly,
+		&i.ParticipantStatus,
 		&i.CreatedAt,
 	)
 	return i, err

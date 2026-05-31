@@ -1,6 +1,7 @@
 package battle_participants
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -275,9 +276,225 @@ func (h Handler) FinishEarly(w http.ResponseWriter, r *http.Request) {
 	}
 
 	allDone, err := h.queries.AllFinishedEarly(r.Context(), btl_uid)
+	count, _ := h.queries.CountActiveParticipants(r.Context(), btl_uid)
+
+	if err == nil && allDone && count == 1 {
+		eloGain := 0
+		if !b.CreatorID.Valid {
+			eloGain = 15
+			participants, err := h.queries.ListParticipants(r.Context(), btl_uid)
+			if err == nil {
+				for _, p := range participants {
+					if p.ParticipantStatus == "active" || p.ParticipantStatus == "finished" {
+						h.queries.UpdateUserElo(r.Context(), db.UpdateUserEloParams{
+							ID:        p.UserID,
+							EloRating: p.EloRating + 15,
+						})
+						break
+					}
+				}
+			}
+		}
+		h.queries.UpdateBattleStatus(r.Context(), db.UpdateBattleStatusParams{
+			ID:     btl_uid,
+			Status: "cancelled",
+		})
+		msg, _ := json.Marshal(map[string]interface{}{"type": "walkover", "elo_gain": eloGain})
+		h.hubs.Broadcast(btl_uid, msg)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	if err == nil && allDone {
 		h.scheduler.SkipInProgress(btl_uid)
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h Handler) Forfeit(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unathorized", http.StatusUnauthorized)
+		return
+	}
+
+	battle_id := chi.URLParam(r, "id")
+	var btl_uid pgtype.UUID
+	if err := btl_uid.Scan(battle_id); err != nil {
+		http.Error(w, "invalid battle id", http.StatusBadRequest)
+		return
+	}
+
+	b, err := h.queries.GetBattle(r.Context(), btl_uid)
+	if err != nil {
+		http.Error(w, "battle not found", http.StatusNotFound)
+		return
+	}
+
+	if b.Status != "in_progress" {
+		http.Error(w, "battle is not in progress", http.StatusBadRequest)
+		return
+	}
+
+	err = h.queries.SetParticipantDisqualified(r.Context(), db.SetParticipantDisqualifiedParams{
+		BattleID: btl_uid,
+		UserID:   user.ID,
+	})
+	if err != nil {
+		http.Error(w, "failed to DQ participant", http.StatusInternalServerError)
+		return
+	}
+
+	allDone, err := h.queries.AllFinishedEarly(r.Context(), btl_uid)
+	if err == nil && allDone {
+		h.scheduler.SkipInProgress(btl_uid)
+	}
+
+	count, err := h.queries.CountActiveParticipants(r.Context(), btl_uid)
+	if err == nil && count == 1 {
+		if !b.CreatorID.Valid {
+			participants, err := h.queries.ListParticipants(r.Context(), btl_uid)
+			if err == nil {
+				for _, p := range participants {
+					if p.ParticipantStatus == "active" || p.ParticipantStatus == "finished" {
+						h.queries.UpdateUserElo(r.Context(), db.UpdateUserEloParams{
+							ID:        p.UserID,
+							EloRating: p.EloRating + 15,
+						})
+						break
+					}
+				}
+			}
+		}
+		h.queries.UpdateBattleStatus(r.Context(), db.UpdateBattleStatusParams{
+			ID:     btl_uid,
+			Status: "cancelled",
+		})
+		msg, _ := json.Marshal(map[string]interface{}{"type": "walkover", "elo_gain": 15})
+		h.hubs.Broadcast(btl_uid, msg)
+		w.WriteHeader(http.StatusNoContent)
+		return
+
+	}
+
+	msg, _ := json.Marshal(map[string]string{"type": "participant_update"})
+	h.hubs.Broadcast(btl_uid, msg)
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h Handler) Rejoin(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unathorized", http.StatusUnauthorized)
+		return
+	}
+
+	battle_id := chi.URLParam(r, "id")
+	var btl_uid pgtype.UUID
+	if err := btl_uid.Scan(battle_id); err != nil {
+		http.Error(w, "invalid battle id", http.StatusBadRequest)
+		return
+	}
+
+	b, err := h.queries.GetBattle(r.Context(), btl_uid)
+	if err != nil {
+		http.Error(w, "battle not found", http.StatusNotFound)
+		return
+	}
+
+	if b.Status != "in_progress" {
+		http.Error(w, "battle is not in progress", http.StatusBadRequest)
+		return
+	}
+
+	// Backend updates the DB (`SetParticipantDisqualified`, `SetParticipantActive`, etc.)
+	err = h.queries.SetParticipantActive(r.Context(), db.SetParticipantActiveParams{
+		BattleID: btl_uid,
+		UserID:   user.ID,
+	})
+	if err != nil {
+		http.Error(w, "failed to set participant to active", http.StatusInternalServerError)
+		return
+	}
+
+	// Backend broadcasts `{"type": "participant_update"}` to all clients in that battle
+	// Each client's `useBattleSocket` receives it → invalidates the participants query
+	msg, _ := json.Marshal(map[string]string{"type": "participant_update"})
+	h.hubs.Broadcast(btl_uid, msg)
+
+	// React Query refetches participants → frontend re-renders showing the new status
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h Handler) Absent(w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetUserFromRequest(r, h.queries)
+	if err != nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	battle_id := chi.URLParam(r, "id")
+	var btl_uid pgtype.UUID
+	if err := btl_uid.Scan(battle_id); err != nil {
+		http.Error(w, "invalid battle id", http.StatusBadRequest)
+		return
+	}
+
+	b, err := h.queries.GetBattle(r.Context(), btl_uid)
+	if err != nil {
+		http.Error(w, "battle not found", http.StatusNotFound)
+		return
+	}
+
+	if b.Status != "in_progress" {
+		http.Error(w, "battle is not in progress", http.StatusBadRequest)
+		return
+	}
+
+	time.AfterFunc(10*time.Second, func() {
+		ctx := context.Background()
+		h.queries.SetParticipantAbsent(ctx, db.SetParticipantAbsentParams{
+			BattleID: btl_uid,
+			UserID:   user.ID,
+		})
+
+		allDone, err := h.queries.AllFinishedEarly(ctx, btl_uid)
+		count, _ := h.queries.CountActiveParticipants(ctx, btl_uid)
+
+		if err == nil && allDone && count == 1 {
+			eloGain := 0
+			if !b.CreatorID.Valid {
+				eloGain = 15
+				participants, err := h.queries.ListParticipants(ctx, btl_uid)
+				if err == nil {
+					for _, p := range participants {
+						if p.ParticipantStatus == "active" || p.ParticipantStatus == "finished" {
+							h.queries.UpdateUserElo(ctx, db.UpdateUserEloParams{
+								ID:        p.UserID,
+								EloRating: p.EloRating + 15,
+							})
+							break
+						}
+					}
+				}
+			}
+			h.queries.UpdateBattleStatus(ctx, db.UpdateBattleStatusParams{
+				ID:     btl_uid,
+				Status: "cancelled",
+			})
+			msg, _ := json.Marshal(map[string]interface{}{"type": "walkover", "elo_gain": eloGain})
+			h.hubs.Broadcast(btl_uid, msg)
+			return
+		}
+
+		if err == nil && allDone {
+			h.scheduler.SkipInProgress(btl_uid)
+		}
+
+		msg, _ := json.Marshal(map[string]string{"type": "participant_update"})
+		h.hubs.Broadcast(btl_uid, msg)
+	})
 	w.WriteHeader(http.StatusNoContent)
 }

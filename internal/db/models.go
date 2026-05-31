@@ -26,16 +26,16 @@ type Battle struct {
 }
 
 type BattleParticipant struct {
-	ID              pgtype.UUID        `json:"id"`
-	BattleID        pgtype.UUID        `json:"battle_id"`
-	UserID          pgtype.UUID        `json:"user_id"`
-	BeatUrl         pgtype.Text        `json:"beat_url"`
-	JoinedAt        pgtype.Timestamptz `json:"joined_at"`
-	DurationSeconds pgtype.Int4        `json:"duration_seconds"`
-	SubmittedAt     pgtype.Timestamptz `json:"submitted_at"`
-	VotesConfirmed  bool               `json:"votes_confirmed"`
-	FinishedEarly   bool               `json:"finished_early"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	ID                pgtype.UUID        `json:"id"`
+	BattleID          pgtype.UUID        `json:"battle_id"`
+	UserID            pgtype.UUID        `json:"user_id"`
+	BeatUrl           pgtype.Text        `json:"beat_url"`
+	JoinedAt          pgtype.Timestamptz `json:"joined_at"`
+	DurationSeconds   pgtype.Int4        `json:"duration_seconds"`
+	SubmittedAt       pgtype.Timestamptz `json:"submitted_at"`
+	VotesConfirmed    bool               `json:"votes_confirmed"`
+	ParticipantStatus string             `json:"participant_status"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }
 
 type BattleQueue struct {
