@@ -49,13 +49,12 @@ func (h *Hub) broadcast(msg []byte) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	for c := range h.clients {
-    select {
-    case c.send <- msg:
-    default:
-        // client is too slow — drop the message rather than blocking everyone
-    }
+		select {
+		case c.send <- msg:
+		default:
+		} // client is too slow — drop the message rather than blocking everyone
+	}
 }
-
 
 // defines a Manager
 type Manager struct {
