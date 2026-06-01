@@ -57,6 +57,24 @@ func (q *Queries) CreateBattle(ctx context.Context, arg CreateBattleParams) (Bat
 	return i, err
 }
 
+const deleteBattle = `-- name: DeleteBattle :exec
+DELETE FROM battles WHERE id = $1
+`
+
+func (q *Queries) DeleteBattle(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteBattle, id)
+	return err
+}
+
+const deleteBattleParticipants = `-- name: DeleteBattleParticipants :exec
+DELETE FROM battle_participants WHERE battle_id = $1
+`
+
+func (q *Queries) DeleteBattleParticipants(ctx context.Context, battleID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteBattleParticipants, battleID)
+	return err
+}
+
 const getBattle = `-- name: GetBattle :one
 SELECT id, creator_id, name, mode, genre, sample_pack_id, status, duration_minutes, max_participants, current_listening_index, listening_order, started_at, completed_at, created_at FROM battles
 WHERE id = $1

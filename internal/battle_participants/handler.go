@@ -287,11 +287,6 @@ func (h Handler) FinishEarly(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// concludeIfWalkover ends the battle as a walkover when only one contender
-// remains (everyone else absent/disqualified). It awards the lone survivor,
-// cancels the battle, and broadcasts a "walkover" message. ELO is only granted
-// for ranked battles (creator_id NULL); custom battles award nothing.
-// Returns true if a walkover was concluded.
 func (h Handler) concludeIfWalkover(ctx context.Context, battleID pgtype.UUID, b db.Battle) bool {
 	count, err := h.queries.CountActiveParticipants(ctx, battleID)
 	if err != nil || count != 1 {
@@ -321,6 +316,14 @@ func (h Handler) concludeIfWalkover(ctx context.Context, battleID pgtype.UUID, b
 	})
 	msg, _ := json.Marshal(map[string]interface{}{"type": "walkover", "elo_gain": eloGain})
 	h.hubs.Broadcast(battleID, msg)
+
+	battleIDStr := fmt.Sprintf("%s", battleID)
+	time.AfterFunc(2*time.Second, func() {
+		ctx := context.Background()
+		h.queries.DeleteBattleParticipants(ctx, battleID)
+		h.queries.DeleteBattle(ctx, battleID)
+		log.Printf("cleanup: deleted walkover battle %s", battleIDStr)
+	})
 	return true
 }
 

@@ -43,6 +43,17 @@ func main() {
 	//create queries & handlers (internal/db - sqlc generated)
 	hubManager := hub.NewManager()
 	queries := db.New(pool)
+
+	// Cleanup DB with battles with dead goroutines
+	if _, err := pool.Exec(context.Background(),
+		`UPDATE battles SET status = 'cancelled'
+		WHERE status IN ('in_progress', 'upload', 'listening', 'voting', 'forming')`); err != nil {
+		log.Printf("startup: failed to cancel stale battles: %v", err)
+	} else {
+		log.Printf("startup: stale mid-battle battles cancelled")
+	}
+
+	// handlers
 	userHandler := user.NewHandler(queries)
 	sched := scheduler.NewScheduler(queries, pool, hubManager)
 	battleHandler := battle.NewHandler(queries, sched, hubManager)

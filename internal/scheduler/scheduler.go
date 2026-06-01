@@ -208,6 +208,21 @@ func (s *Scheduler) Run(ctx context.Context, battleID pgtype.UUID, duration time
 		s.hubs.SetOnEmpty(battleID, func() {
 			os.RemoveAll(fmt.Sprintf("uploads/%s", battleIDStr))
 			log.Printf("scheduler: cleaned up uploads for battle %s", battleIDStr)
+
+			//battle deletion after completion
+			ctx := context.Background()
+			if _, err := s.pool.Exec(ctx,
+				`DELETE FROM battle_participants WHERE battle_id = $1`, battleID); err != nil {
+				log.Printf("scheduler: failed to delete participants for battle %s: %v", battleIDStr, err)
+				return
+			}
+			if _, err := s.pool.Exec(ctx,
+				`DELETE FROM battles WHERE id = $1`, battleID); err != nil {
+				log.Printf("scheduler: failed to delete battle %s: %v", battleIDStr, err)
+			} else {
+				log.Printf("scheduler: deleted battle %s", battleIDStr)
+			}
+
 		})
 
 		battle, err := s.queries.GetBattle(ctx, battleID)

@@ -35,3 +35,9 @@ UPDATE battles
 SET listening_order = $2
 WHERE id = $1
 RETURNING *;
+
+-- name: DeleteBattleParticipants :exec
+DELETE FROM battle_participants WHERE battle_id = $1;
+
+-- name: DeleteBattle :exec
+DELETE FROM battles WHERE id = $1;

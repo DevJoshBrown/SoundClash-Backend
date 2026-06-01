@@ -3,6 +3,7 @@ package battle
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -325,6 +326,14 @@ func (h Handler) CancelBattle(w http.ResponseWriter, r *http.Request) {
 		log.Printf("CancelBattle: failed to marshal broadcast")
 	}
 	h.hubs.Broadcast(btl_uid, msg)
+
+	battleIDStr := fmt.Sprintf("%s", btl_uid)
+	time.AfterFunc(2*time.Second, func() {
+		ctx := context.Background()
+		h.queries.DeleteBattleParticipants(ctx, btl_uid)
+		h.queries.DeleteBattle(ctx, btl_uid)
+		log.Printf("cleanup: deleted cancelled battle %s", battleIDStr)
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }
