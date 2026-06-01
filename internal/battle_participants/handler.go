@@ -344,7 +344,7 @@ func (h Handler) Forfeit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if b.Status != "in_progress" {
+	if b.Status == "waiting" || b.Status == "results" {
 		http.Error(w, "battle is not in progress", http.StatusBadRequest)
 		return
 	}
@@ -445,23 +445,62 @@ func (h Handler) Absent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//time.AfterFunc(10*time.Second, func() {
 	ctx := context.Background()
 	h.queries.SetParticipantAbsent(ctx, db.SetParticipantAbsentParams{
 		BattleID: btl_uid,
 		UserID:   user.ID,
 	})
 
-	allDone, err := h.queries.AllFinishedEarly(ctx, btl_uid)
-	if err == nil && allDone {
-		if h.concludeIfWalkover(ctx, btl_uid, b) {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		h.scheduler.SkipInProgress(btl_uid)
-	}
-
+	// Tell everyone this player is now absent so their card greys out.
 	msg, _ := json.Marshal(map[string]string{"type": "participant_update"})
 	h.hubs.Broadcast(btl_uid, msg)
+
+	// Give them 60s to rejoin. If they're still absent when the timer fires they
+	// forfeit, which then resolves the battle the same way an explicit forfeit does.
+	time.AfterFunc(60*time.Second, func() {
+		ctx := context.Background()
+		p, err := h.queries.GetParticipant(ctx, db.GetParticipantParams{
+			BattleID: btl_uid,
+			UserID:   user.ID,
+		})
+		if err != nil || p.ParticipantStatus != "absent" {
+			return // they rejoined
+		}
+
+		h.queries.SetParticipantDisqualified(ctx, db.SetParticipantDisqualifiedParams{
+			BattleID: btl_uid,
+			UserID:   user.ID,
+		})
+
+		current, err := h.queries.GetBattle(ctx, btl_uid)
+		if err != nil {
+			return
+		}
+
+		if h.concludeIfWalkover(ctx, btl_uid, current) {
+			return
+		}
+
+		// Everyone abandoned — no one left to crown. Cancel the battle outright
+		// rather than limping to an empty results screen.
+		if count, err := h.queries.CountActiveParticipants(ctx, btl_uid); err == nil && count == 0 {
+			h.queries.UpdateBattleStatus(ctx, db.UpdateBattleStatusParams{
+				ID:     btl_uid,
+				Status: "cancelled",
+			})
+			msg, _ := json.Marshal(map[string]string{"type": "stage_change", "status": "cancelled"})
+			h.hubs.Broadcast(btl_uid, msg)
+			return
+		}
+
+		allDone, err := h.queries.AllFinishedEarly(ctx, btl_uid)
+		if err == nil && allDone {
+			h.scheduler.SkipInProgress(btl_uid)
+		}
+
+		msg, _ := json.Marshal(map[string]string{"type": "participant_update"})
+		h.hubs.Broadcast(btl_uid, msg)
+	})
+
 	w.WriteHeader(http.StatusNoContent)
 }
