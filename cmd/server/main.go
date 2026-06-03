@@ -14,10 +14,12 @@ import (
 	"github.com/DevJoshBrown/BeatBattler/internal/matchmaker"
 	"github.com/DevJoshBrown/BeatBattler/internal/middleware"
 	"github.com/DevJoshBrown/BeatBattler/internal/queue"
+	"github.com/DevJoshBrown/BeatBattler/internal/sample_pack"
 	"github.com/DevJoshBrown/BeatBattler/internal/scheduler"
 	"github.com/DevJoshBrown/BeatBattler/internal/user"
 	votes "github.com/DevJoshBrown/BeatBattler/internal/vote"
 	"github.com/DevJoshBrown/BeatBattler/pkg/storage/postgres"
+	"github.com/DevJoshBrown/BeatBattler/pkg/storage/r2"
 	clerkSDK "github.com/clerk/clerk-sdk-go/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
@@ -43,6 +45,7 @@ func main() {
 	//create queries & handlers (internal/db - sqlc generated)
 	hubManager := hub.NewManager()
 	queries := db.New(pool)
+	r2Client := r2.NewClient(cfg.R2Endpoint, cfg.R2AccessKey, cfg.R2SecretKey, cfg.R2Bucket, cfg.R2PublicURL)
 
 	// Cleanup DB with battles with dead goroutines
 	if _, err := pool.Exec(context.Background(),
@@ -61,6 +64,7 @@ func main() {
 	voteHandler := votes.NewHandler(queries)
 	queueHandler := queue.NewHandler(queries)
 	audioHandler := audio.NewHandler(queries)
+	samplePackHander := sample_pack.NewHandler(queries, r2Client)
 
 	//matchmaker register
 	mm := matchmaker.New(queries, sched)
@@ -119,7 +123,9 @@ func main() {
 		r.Post("/battles/{id}/forfeit", participantHandler.Forfeit)
 		r.Post("/battles/{id}/rejoin", participantHandler.Rejoin)
 		r.Post("/battles/{id}/absent", participantHandler.Absent)
-
+		// sample packs
+		r.Post("/sample-packs", samplePackHander.UploadSamplePack)
+		r.Get("/sample-packs", samplePackHander.ListSamplePacks)
 		// votes
 		r.Post("/battles/{id}/vote", voteHandler.CastVote)
 		r.Post("/battles/{id}/confirm-votes", voteHandler.ConfirmVotes)
