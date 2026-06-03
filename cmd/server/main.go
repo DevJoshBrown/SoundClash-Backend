@@ -72,9 +72,10 @@ func main() {
 	// Add CORS middleware
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://localhost:5173"},
-		AllowedMethods: []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders: []string{"Content-Type", "Authorization", "X-User-ID"},
+		AllowedOrigins:   []string{cfg.AllowedOrigin},
+		AllowedMethods:   []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-User-ID"},
+		AllowCredentials: true,
 	}))
 
 	r.Options("/*", func(w http.ResponseWriter, r *http.Request) {})
