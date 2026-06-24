@@ -13,6 +13,7 @@ You will notice a significant front end design is in place that i must credit mo
 
 ## USAGE
 Due to a lack of users, you will likely struggle to actually partake in a battle unless you also find a friend (or rival!) to sign up and play with you. The best way to play is to create a custom Lobby, select your game options, and have them join your battle.
+
 <img width="536" height="691" alt="image" src="https://github.com/user-attachments/assets/5a143505-9b55-4e70-bc86-aa2c13c0c7f7" />
 
 The system runs on a schedular with webhooks that keep all users in sync, battles managed properly, and accounts for a lot of challenging edge cases that actually took up the majority of the development time overcoming. The systems current state is very robust and accounts for lots of edge case scenarios such as temporary disconnects, forfeits, oversize file uploads, browser refresh issues, and keeping all participants in sync to a tight battle schedule, so they can all experience the battle concurrently, with no latency.
