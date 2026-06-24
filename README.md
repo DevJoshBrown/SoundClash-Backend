@@ -4,7 +4,7 @@
 Soundclash is a web application powered by Golang, where music producers can participate in multiplayer timed battles to produce the best track within a time limit, and then rate each others work and vote for the winner at the end. This backend repo is responsible for managing users, the battle schedular, leaderboards, matchmaking, and audio uploads & downloads. 
 <img width="1904" height="897" alt="image" src="https://github.com/user-attachments/assets/6e20c336-4917-4ec8-8f18-bd28967a2bd5" />
 
-## MOTIVATIONS
+## MOTIVATION
 As a electronic music enthusiast i noticed a similar platform gaining traction online, but found this platform to be clunky, unresponsive, poorly optimised, and heavily focused on a neiche genre of music that is not to my taste. This project is inspired by a desire to create a more robust and hollistic platform for the same purpose, that would scale to handle thousands of users and concurrent battles. There are still plenty of features that would make this platform better, and I hope that in time i will be able to improve and iterate on this project so it is suitable for public release and even sponsored events (I'm looking at you, Red Bull). This is a platform for creatives to share their passion, improve their creative works, and compete for leaderboard titles to be the best producer on the internet!
 
 ## QUICK START:
